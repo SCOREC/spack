@@ -102,7 +102,7 @@ class IntelMpi(IntelPackage):
         # and friends are set to point to the Intel compilers, but in
         # practice, mpicc fails to compile some applications while
         # mpiicc works.
-        bindir = self.prefix.compilers_and_libraries.linux.mpi.intel64.bin
+        bindir = self.prefix.bin
 
         if self.compiler.name == 'intel':
             self.spec.mpicc  = bindir.mpiicc
