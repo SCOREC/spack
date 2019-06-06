@@ -30,7 +30,7 @@ class OmegaH(CMakePackage):
     variant('shared', default=True, description='Build shared libraries')
     variant('mpi', default=True, description='Activates MPI support')
     variant('zlib', default=True, description='Activates ZLib support')
-    variant('trilinos', default=True, description='Use Teuchos and Kokkos')
+    variant('kokkos', default=True, description='Use Kokkos')
     variant('throw', default=False, description='Errors throw exceptions instead of abort')
     variant('examples', default=False, description='Compile examples')
     variant('optimize', default=True, description='Compile C++ with optimization')
@@ -39,7 +39,7 @@ class OmegaH(CMakePackage):
 
     depends_on('gmsh', when='+examples', type='build')
     depends_on('mpi', when='+mpi')
-    depends_on('trilinos +kokkos +teuchos', when='+trilinos')
+    depends_on('kokkos', when='+kokkos')
     depends_on('zlib', when='+zlib')
 
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=86610
@@ -66,8 +66,10 @@ class OmegaH(CMakePackage):
                 self.spec['mpi'].mpicxx))
         else:
             args.append('-DOmega_h_USE_MPI:BOOL=OFF')
-        if '+trilinos' in self.spec:
-            args.append('-DOmega_h_USE_Trilinos:BOOL=ON')
+        if '+kokkos' in self.spec:
+            args.append('-DOmega_h_USE_Kokkos:BOOL=ON')
+            args.append('-DKokkos_PREFIX={0}'.format(
+                self.spec['kokkos'].prefix + '/lib/CMake/Kokkos'))
         if '+zlib' in self.spec:
             args.append('-DOmega_h_USE_ZLIB:BOOL=ON')
             args.append('-DZLIB_ROOT:PATH={0}'.format(
