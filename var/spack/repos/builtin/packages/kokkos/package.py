@@ -6,7 +6,7 @@
 from spack import *
 
 
-class Kokkos(Package):
+class Kokkos(CMakePackage):
     """Kokkos implements a programming model in C++ for writing performance
     portable applications targeting all major HPC platforms."""
 
@@ -35,6 +35,8 @@ class Kokkos(Package):
     variant('qthreads', default=False, description="enable Qthreads backend")
     variant('cuda', default=False, description="enable Cuda backend")
     variant('openmp', default=False, description="enable OpenMP backend")
+    variant('debug', default=False,
+        description="enable compile and runtime options to aid debugging")
 
     # Compilation options
     variant('pic', default=False,
@@ -134,81 +136,64 @@ class Kokkos(Package):
     depends_on('qthreads', when='+qthreads')
     depends_on('cuda', when='+cuda')
 
-    def install(self, spec, prefix):
-        generate = which(join_path(self.stage.source_path,
-                                   'generate_makefile.bash'))
-        with working_dir('build', create=True):
-            g_args = [
-                '--prefix=%s' % prefix,
-                '--with-hwloc=%s' % spec['hwloc'].prefix,
-            ]
-            arch_args = []
-            kokkos_options_args = []
-            cuda_options_args = []
+    def cmake_args(self):
+        spec = self.spec
 
-            # PIC
-            if '+pic' in spec:
-                g_args.append('--cxxflags=-fPIC')
+        args = []
+        if '+serial' in spec:
+            args.append('-DKOKKOS_ENABLE_SERIAL=ON')
+        if '+openmp' in spec:
+            args.append('-DKOKKOS_ENABLE_OPENMP=ON')
+        if '+qthreads' in spec:
+            args.append('-DKOKKOS_ENABLE_QTHREADS=ON')
+        if '+pthreads' in spec:
+            args.append('-DKOKKOS_ENABLE_PTHREAD=ON')
+        if '+cuda' in spec:
+            args.append('-DKOKKOS_ENABLE_CUDA=ON')
 
-            # Build Debug
-            if '+debug' in spec:
-                g_args.append('--debug')
+        if '+pic' in spec:
+            args.append('-DBUILD_SHARED_LIBS=ON')
+        if '+debug' in spec:
+            args.append('-DKOKKOS_ENABLE_DEBUG=ON')
 
-            # Backends
-            if '+serial' in spec:
-                g_args.append('--with-serial')
-            if '+openmp' in spec:
-                g_args.append('--with-openmp')
-            if '+pthreads' in spec:
-                g_args.append('--with-pthread')
-            if '+qthreads' in spec:
-                g_args.append('--with-qthreads=%s' % spec['qthreads'].prefix)
-            if '+cuda' in spec:
-                g_args.append('--with-cuda=%s' % spec['cuda'].prefix)
-            # Host architectures
-            host_arch = spec.variants['host_arch'].value
-            # GPU architectures
-            gpu_arch  = spec.variants['gpu_arch'].value
-            if host_arch != 'none':
-                arch_args.append(host_arch)
-            if gpu_arch != 'none':
-                arch_args.append(gpu_arch)
-            # Combined architecture flags
-            if arch_args:
-                g_args.append('--arch={0}'.format(','.join(arch_args)))
+        arch_args = []
+        kokkos_options_args = []
+        cuda_options_args = []
 
-            # CUDA options
-            if '+force_uvm' in spec:
-                cuda_options_args.append('force_uvm')
-            if '+use_ldg' in spec:
-                cuda_options_args.append('use_ldg')
-            if '+rdc' in spec:
-                cuda_options_args.append('rdc')
-            if '+enable_lambda' in spec:
-                cuda_options_args.append('enable_lambda')
-            if cuda_options_args:
-                g_args.append('--with-cuda-options={0}'
-                              .format(','.join(cuda_options_args)))
+        # Host architectures
+        host_arch = spec.variants['host_arch'].value
+        # GPU architectures
+        gpu_arch  = spec.variants['gpu_arch'].value
+        if host_arch != 'none':
+            arch_args.append(host_arch)
+        if gpu_arch != 'none':
+            arch_args.append(gpu_arch)
+        # Combined architecture flags
+        if arch_args:
+            args.append('-DKOKKOS_ARCH={0}'.format(','.join(arch_args)))
 
-            # Kokkos options
-            if '+aggressive_vectorization' in spec:
-                kokkos_options_args.append('aggressive_vectorization')
-            if '+disable_profiling' in spec:
-                kokkos_options_args.append('disable_profiling')
-            if '+disable_dualview_modify_check' in spec:
-                kokkos_options_args.append('disable_dualview_modify_check')
-            if '+enable_profile_load_print' in spec:
-                kokkos_options_args.append('enable_profile_load_print')
-            if '+compiler_warnings' in spec:
-                kokkos_options_args.append('compiler_warnings')
-            if '+disable_deprecated_code' in spec:
-                kokkos_options_args.append('disable_deprecated_code')
-            if '+enable_eti' in spec:
-                kokkos_options_args.append('enable_eti')
-            if kokkos_options_args:
-                g_args.append('--with-options={0}'
-                              .format(','.join(kokkos_options_args)))
+        # CUDA options
+        if '+force_uvm' in spec:
+            args.append('-DKOKKOS_ENABLE_CUDA_UVM=ON')
+        if '+use_ldg' in spec:
+            args.append('-DKOKKOS_ENABLE_CUDA_LDG_INTRINSIC=ON')
+        if '+enable_lambda' in spec:
+            args.append('-DKOKKOS_ENABLE_CUDA_LAMBDA=ON')
 
-            generate(*g_args)
-            make()
-            make('install')
+        # Kokkos options
+        if '+aggressive_vectorization' in spec:
+            args.append('-DKOKKOS_ENABLE_AGGRESSIVE_VECTORIZATION=ON')
+        if '+disable_profiling' in spec:
+            args.append('-DKOKKOS_ENABLE_PROFILING=OFF')
+        if '+disable_dualview_modify_check' in spec:
+            args.append('-DKOKKOS_ENABLE_DEBUG_DUALVIEW_MODIFY_CHECK=OFF')
+        if '+enable_profile_load_print' in spec:
+            args.append('-DKOKKOS_ENABLE_PROFILING_LOAD_PRINT=OFF')
+        if '+compiler_warnings' in spec:
+            args.append('-DKOKKOS_ENABLE_COMPILER_WARNINGS=ON')
+        if '+disable_deprecated_code' in spec:
+            args.append('-DKOKKOS_ENABLE_DEPRECATED_CODE=OFF')
+        if '+enable_eti' in spec:
+            args.append('-DKOKKOS_ENABLE_EXPLICIT_INSTANTIATION=ON')
+
+        return args
