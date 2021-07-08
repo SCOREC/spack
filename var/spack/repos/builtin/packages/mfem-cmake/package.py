@@ -6,7 +6,7 @@
 from spack import *
 
 
-class Mfem(CMakePackage):
+class MfemCmake(CMakePackage):
     """Free, lightweight, scalable C++ library for finite element methods."""
 
     tags = ['FEM', 'finite elements', 'high-order', 'AMR', 'HPC']
