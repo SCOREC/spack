@@ -42,9 +42,7 @@ class MfemCmake(CMakePackage):
 
     depends_on('metis', when='+metis')
 
-    depends_on('pumi@2.2.3:', when='@4.2.0:+pumi')
-    depends_on('pumi', when='+pumi~shared')
-    depends_on('pumi+shared', when='+pumi+shared')
+    depends_on('pumi', when='+pumi')
 
     def cmake_args(self):
         spec = self.spec
