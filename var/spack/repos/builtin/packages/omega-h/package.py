@@ -45,6 +45,7 @@ class OmegaH(CMakePackage, CudaPackage):
     depends_on('mpi', when='+mpi')
     depends_on('trilinos +kokkos', when='+trilinos')
     depends_on('zlib', when='+zlib')
+    # Note: '+cuda' and 'cuda_arch' variants are added by the CudaPackage
     depends_on('cuda', when='+cuda')
 
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=86610
@@ -73,6 +74,12 @@ class OmegaH(CMakePackage, CudaPackage):
             args.append('-DOmega_h_USE_MPI:BOOL=OFF')
         if '+cuda' in self.spec:
             args.append('-DOmega_h_USE_CUDA:BOOL=ON')
+            cuda_arch_list = self.spec.variants['cuda_arch'].value
+            cuda_arch = cuda_arch_list[0]
+            if cuda_arch != 'none':
+                args.append('-DOmega_h_CUDA_ARCH={0}'.format(cuda_arch))
+        else:
+            args.append('-DOmega_h_USE_CUDA:BOOL=OFF')
         if '+trilinos' in self.spec:
             args.append('-DOmega_h_USE_Trilinos:BOOL=ON')
         if '+zlib' in self.spec:
