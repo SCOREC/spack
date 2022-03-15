@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 
-class OmegaH(CMakePackage):
+class OmegaH(CMakePackage, CudaPackage):
     """Omega_h is a C++11 library providing data structures and algorithms
     for adaptive discretizations. Its specialty is anisotropic triangle and
     tetrahedral mesh adaptation. It runs efficiently on most modern HPC
@@ -45,6 +45,7 @@ class OmegaH(CMakePackage):
     depends_on('mpi', when='+mpi')
     depends_on('trilinos +kokkos', when='+trilinos')
     depends_on('zlib', when='+zlib')
+    depends_on('cuda', when='+cuda')
 
     # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=86610
     conflicts('%gcc@8:8.2', when='@:9.22.1')
@@ -70,6 +71,8 @@ class OmegaH(CMakePackage):
                 self.spec['mpi'].mpicxx))
         else:
             args.append('-DOmega_h_USE_MPI:BOOL=OFF')
+        if '+cuda' in self.spec:
+            args.append('-DOmega_h_USE_CUDA:BOOL=ON')
         if '+trilinos' in self.spec:
             args.append('-DOmega_h_USE_Trilinos:BOOL=ON')
         if '+zlib' in self.spec:
