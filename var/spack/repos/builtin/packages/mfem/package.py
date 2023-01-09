@@ -804,6 +804,10 @@ class Mfem(Package, CudaPackage, ROCmPackage):
                 "apf_zoltan",
                 "spr",
             ]
+            if '+zoltan' in spec['pumi']:
+              pumi_libs += ['zoltan']
+              if '+parmetis' in spec['zoltan']:
+                pumi_libs += ['parmetis']
             options += [
                 "PUMI_OPT=-I%s" % spec["pumi"].prefix.include,
                 "PUMI_LIB=%s" % ld_flags_from_dirs([spec["pumi"].prefix.lib], pumi_libs),
