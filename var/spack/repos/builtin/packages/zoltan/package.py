@@ -122,22 +122,24 @@ class Zoltan(AutotoolsPackage):
             if '+int64' in spec['metis']:
                 config_args.append('--with-id-type=ulong')
             else:
-                config_args.append('--with-id-type=uint')
+                config_args.append("--with-id-type=uint")
 
-        if '+mpi' in spec:
-            config_args.extend([
-                'CC={0}'.format(spec['mpi'].mpicc),
-                'CXX={0}'.format(spec['mpi'].mpicxx),
-                'FC={0}'.format(spec['mpi'].mpifc),
-                '--with-mpi={0}'.format(spec['mpi'].prefix),
-
-                # NOTE: Zoltan assumes that it's linking against an MPI library
-                # that can be found with '-lmpi' which isn't the case for many
-                # MPI packages. We rely on the MPI-wrappers to automatically
-                # add what is required for linking and thus pass an empty
-                # list of libs
-                '--with-mpi-libs= '
-            ])
+        if "+mpi" in spec:
+            config_args.extend(
+                [
+                    "CC={0}".format(spec["mpi"].mpicc),
+                    "CXX={0}".format(spec["mpi"].mpicxx),
+                    "--with-mpi={0}".format(spec["mpi"].prefix),
+                    # NOTE: Zoltan assumes that it's linking against an MPI library
+                    # that can be found with '-lmpi' which isn't the case for many
+                    # MPI packages. We rely on the MPI-wrappers to automatically
+                    # add what is required for linking and thus pass an empty
+                    # list of libs
+                    "--with-mpi-libs= ",
+                ]
+            )
+            if "+fortran" in spec:
+               config_args.extend( ["FC={0}".format(spec["mpi"].mpifc)] )
 
         config_fcflags = config_cflags[:]
         if spec.satisfies('%gcc@10:+fortran'):
