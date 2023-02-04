@@ -58,8 +58,11 @@ class Pumi(CMakePackage):
     depends_on('zoltan+int64', when='+zoltan+int64')
     simbase = "+base"
     simkernels = simbase + "+parasolid+acis+discrete"
-    simfull = simkernels + "+abstract+adv+advmodel\
-                            +import+paralleladapt+parallelmesh"
+    simfull = (
+        simkernels
+        + "+crack+abstract+adv+advmodel\
+           +import+paralleladapt+parallelmesh"
+    )
     depends_on('simmetrix-simmodsuite' + simbase,
                when='simmodsuite=base')
     depends_on('simmetrix-simmodsuite' + simkernels,
@@ -71,31 +74,31 @@ class Pumi(CMakePackage):
         spec = self.spec
 
         args = [
-            '-DSCOREC_CXX_WARNINGS=OFF',
-            self.define_from_variant('ENABLE_ZOLTAN', 'zoltan'),
-            '-DCMAKE_C_COMPILER=%s' % spec['mpi'].mpicc,
-            '-DCMAKE_CXX_COMPILER=%s' % spec['mpi'].mpicxx,
-            self.define_from_variant('BUILD_SHARED_LIBS', 'shared'),
-            '-DCMAKE_Fortran_COMPILER=%s' % spec['mpi'].mpifc,
-            self.define_from_variant('PUMI_FORTRAN_INTERFACE', 'fortran'),
-            '-DMDS_ID_TYPE=%s' % ('long' if '+int64' in spec else 'int'),
-            '-DSKIP_SIMMETRIX_VERSION_CHECK=%s' %
-            ('ON' if '~simmodsuite_version_check' in spec else 'OFF'),
-            self.define_from_variant('IS_TESTING', 'testing'),
-            '-DMESHES=%s' % join_path(self.stage.source_path, 'pumi-meshes')
+            "-DSCOREC_CXX_WARNINGS=OFF",
+            self.define_from_variant("ENABLE_ZOLTAN", "zoltan"),
+            "-DCMAKE_C_COMPILER=%s" % spec["mpi"].mpicc,
+            "-DCMAKE_CXX_COMPILER=%s" % spec["mpi"].mpicxx,
+            self.define_from_variant("BUILD_SHARED_LIBS", "shared"),
+            self.define_from_variant("PUMI_FORTRAN_INTERFACE", "fortran"),
+            "-DMDS_ID_TYPE=%s" % ("long" if "+int64" in spec else "int"),
+            "-DSKIP_SIMMETRIX_VERSION_CHECK=%s"
+            % ("ON" if "~simmodsuite_version_check" in spec else "OFF"),
+            self.define_from_variant("IS_TESTING", "testing"),
+            "-DMESHES=%s" % join_path(self.stage.source_path, "pumi-meshes"),
         ]
-        if spec.satisfies('@2.2.3'):
-            args += ['-DCMAKE_CXX_STANDARD=11']
-        if self.spec.satisfies('simmodsuite=base'):
-            args.append('-DENABLE_SIMMETRIX=ON')
-        if self.spec.satisfies('simmodsuite=kernels') or \
-           self.spec.satisfies('simmodsuite=full'):
-            args.append('-DENABLE_SIMMETRIX=ON')
-            args.append('-DSIM_PARASOLID=ON')
-            args.append('-DSIM_ACIS=ON')
-            args.append('-DSIM_DISCRETE=ON')
-            mpi_id = spec['mpi'].name + spec['mpi'].version.string
-            args.append('-DSIM_MPI=' + mpi_id)
+        if spec.satisfies("fortran"):
+            args += ["-DCMAKE_Fortran_COMPILER=%s" % spec["mpi"].mpifc]
+        if spec.satisfies("@2.2.3"):
+            args += ["-DCMAKE_CXX_STANDARD=11"]
+        if self.spec.satisfies("simmodsuite=base"):
+            args.append("-DENABLE_SIMMETRIX=ON")
+        if self.spec.satisfies("simmodsuite=kernels") or self.spec.satisfies("simmodsuite=full"):
+            args.append("-DENABLE_SIMMETRIX=ON")
+            args.append("-DSIM_PARASOLID=ON")
+            args.append("-DSIM_ACIS=ON")
+            args.append("-DSIM_DISCRETE=ON")
+            mpi_id = spec["mpi"].name + spec["mpi"].version.string
+            args.append("-DSIM_MPI=" + mpi_id)
         return args
 
     def test(self):
