@@ -68,12 +68,15 @@ class Pumi(CMakePackage):
     simkernels = simbase + "+parasolid+acis+discrete"
     simfull = (
         simkernels
-        + "+abstract+adv+advmodel\
-                            +import+paralleladapt+parallelmesh"
+        + "+crack+abstract+adv+advmodel\
+           +import+paralleladapt+parallelmesh"
     )
-    depends_on("simmetrix-simmodsuite" + simbase, when="simmodsuite=base")
-    depends_on("simmetrix-simmodsuite" + simkernels, when="simmodsuite=kernels")
-    depends_on("simmetrix-simmodsuite" + simfull, when="simmodsuite=full")
+    depends_on('simmetrix-simmodsuite' + simbase,
+               when='simmodsuite=base')
+    depends_on('simmetrix-simmodsuite' + simkernels,
+               when='simmodsuite=kernels')
+    depends_on('simmetrix-simmodsuite' + simfull,
+               when='simmodsuite=full')
 
     def cmake_args(self):
         spec = self.spec
