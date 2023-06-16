@@ -8,6 +8,43 @@ import os
 from spack.package import *
 
 RELEASES = [
+   {
+   'version': '2023.1-230428dev',
+   'components': {
+      'msparalleladapt': ['16c886fe9556b90fea99e2b76b9b679cd2f044ac73764939881361009df7776d', 'paralleladapt'],
+      'pskrnl': ['e852750446c2ca98d0c8b47d83d8dcd087a2c10b0a6683a878d9eba4c167b59a', 'parasolid'],
+      'msadv': ['ccd3e2f69cf1ca637b0fae0ae1dc8d16e73569ad51cf65e667d262a8bcef0e00', 'adv'],
+      'gmcore': ['b2dfebf01755437ea20942d91177ced1c5445d8f868d8b8023bfb49682ded11b', 'base'],
+      'psint': ['b91d28606182bf1efe286708da43d57d00dd482f06ee8cb0ade3f6e53c73f164', 'parasolid'],
+      'mscrack': ['5a70fd3ea9b4dfca91d142c10820d0f8935fa85bfaab5ca14070f1dab470ea13', 'crack'],
+      'aciskrnl': ['2f0c328ffde7bea1a735ae2609f9395e70630d8d4eb51bc34934c0d6c3d58753', 'acis'],
+      'gmadv': ['007c5422350c48b3b072d68d44dcd4832245565119e3041ffb9ac3d67b4dfd22', 'advmodel'],
+      'discrete': ['beec74b4b01c735736a39ad1a7f58b380717eb07bc6aa89287a5ad2679053682', 'discrete'],
+      'msparallelmesh': ['5d5db7e62893f2dce8ce85b3601784799654b5cea2f87a05e30563d5f7c55148', 'parallelmesh'],
+      'gmvoxel': ['9348c3445ce6cdff39fa801818fe9a320615757981de75dee415aa1197cb231f', 'voxel'],
+      'fdcore': ['d3291a9da8e3ee9fb9ac373e4ceca701881d2ada04734718b42fc2074d1b77fb', 'base'],
+      'msadapt': ['b5d33b4896a17ed13c9e4961e9f41c55683935eec266aa9545a71574706c2aa3', 'base'],
+      'gmabstract': ['3b85b3949f84eab105cb8775f582431f341d0f956c501017213bc2faeb897fd9', 'abstract'],
+      'mscore': ['708dbafb07e0bdccc2e820f18e9019eceb49bff39ae729c11bf930f003acadd2', 'base'],
+      },
+   'docs': {
+      'GeomSimAbstract': ['af057e1f2f3e071fe9eacee5fbd48309682bfd04c7b0c879bd8612cbc34e791b', 'abstract'],
+      'GeomSimDiscrete': ['52d29bb2820f9643b8c233b0f6c3509acb9532bbab18ce9bcc437fb1a8e987fe', 'discrete'],
+      'GeomSim': ['539fea7130c62aaa313cc8414628bb68f66277d7d20c3320d4ed6c3e46bcd398', 'base'],
+      'GeomSimParasolid': ['c54888b3bad1604dff6c26091554239a47e268d185169d630c55485a3e62ffde', 'parasolid'],
+      'ParallelMeshSim': ['5541a0b50b66adcbb55f2043b54d3d6a346b51876e15dc6cc317589e2b3de505', 'parallelmesh'],
+      'ParallelMeshSimAdapt': ['ae4f010223cceb9ff4771e3c333ec81d5a471a1b71dccfbcdedcc526970f429d', 'paralleladapt'],
+      'GeomSimAcis': ['567728de91e5cd310e5d6ae4ec3e8fe354a02952ca6f96072ef2f5acd17c435c', 'acis'],
+      'GeomSimVoxel': ['8ed2f0ccde70fb4f9e35a74de4d9584ec778eca16ab00f17acf9603c4831572f', 'voxel'],
+      'FieldSim': ['420c06fc0867fc7dc5d6c2bdf9eb6abd5116a9c5cb3427286ebd17def1b7ec6d', 'base'],
+      'MeshSimAdvanced': ['3c9ff434e6c101dfe712c0943aa6beab8d47fdc6735ab5df4a154453f949e5b7', 'adv'],
+      'GeomSimAdvanced': ['ab829df31bb690073a761abc69be3e24172b811b0ba946beef3aa4491e1af2ae', 'advmodel'],
+      'GeomSimDiscreteModeling': ['3f620a3df57060d4c063a6f236e709884a3c67dcac763aa797cdbb81b8d14bda', 'discrete'],
+      'MeshSimCrack': ['4e1cb0f4d073a7a59998c3099ccb6346ca66746cca3080b734b593c0745266a1', 'crack'],
+      'MeshSimAdapt': ['ed3350b849fd7c1a220815b95a4af3c6c822f3efc53e847217da03b9de15256b', 'base'],
+      'MeshSim': ['40eee3108c01f299d16c8de8583cbffbed54af2ecf135a8b6fec046b796b4502', 'base'],
+      }
+   },
    {   
     'version': '18.0-220930beta',
     'components': {
@@ -558,6 +595,7 @@ class SimmetrixSimmodsuite(Package):
     license_vars = ["SIM_LICENSE_FILE"]
 
     variant("base", default=True, description="enable the base components")
+    variant("crack", default=True, description="enable the meshsim crack components")
     variant("advmodel", default=False, description="enable advaced modeling")
     variant("abstract", default=False, description="enable abstract modeling")
     variant("voxel", default=False, description="enable voxel modeling")
