@@ -48,6 +48,115 @@ def simmodsuite_releases():
             }
         },
     {
+        'version': '2023.1-230907dev',
+        'components': {
+           'fdcore': ['cdb3e937c064ebfb7f8c45b5de7cff7e4ca4a727d3a33e979f62687dab2b8bf8', 'base'],
+           'mscore': ['38b3e9ea02872ac0a760df5c0cb9999f6afef43905a9a78c9a63ce79e3b2c176', 'base'],
+           'gmadv': ['ab942e2e9f118811dddb8bc812b662b752176a6aa61f16847d713e8e197469f8', 'advmodel'],
+           'msparallelmesh': ['2bb9d824d1cec9a9b983713d0f4cb980e44a99d8f25f74ae87d3162c8cabd9bd', 'parallelmesh'],
+           'aciskrnl': ['c8512becbc1b42ef2a787f0144b5bace01753c9538f4a39efa6613c3998fae56', 'acis'],
+           'mscrack': ['d51f979420026f987795c538c5365ca6243a69b1dfe481037f874e7abfc53ffe', 'crack'],
+           'discrete': ['0fc27c2705ff5d90f3daa8bca25288f83326a33cc39f4101465bb7df346b3617', 'discrete'],
+           'msadv': ['4eb40f73181219336b57e8c6b07eb64f43f8e99b74ff19b447c0d72e9e821e8e', 'adv'],
+           'psint': ['d660e3a79f0912de98fb94a585ca106a2027d1f14b2eb586292d5b5eef24261d', 'parasolid'],
+           'gmabstract': ['0204acf10f39feaadcd34e99a4603d5e92a37b0ec2357c0d0134ec8397fe184a', 'abstract'],
+           'gmcore': ['3fd94c35d6336ccd22f6925c994907608880eb0ad11db188a87f12dd40f373c8', 'base'],
+           'pskrnl': ['c36423e668788a77669578cf3a0919ace279c7fa2fcf640964dc8e5b002bf109', 'parasolid'],
+           'gmvoxel': ['26535d3482ff975a5270ecff093c4bc3d9ebf3eaf1bce2d0bfb0f6c66a2431c8', 'voxel'],
+           'msparalleladapt': ['80457230df9907f001deedc3aa50dc28c4d19e775fe466fa7c54648a47c4e65a', 'paralleladapt'],
+           'msadapt': ['50fcf225404f7f42c703db2d44687075dd4ce410449ed0c39864224c2b3ecb1d', 'base'],
+        },
+        'docs': {
+           'GeomSimVoxel': ['84aff0bd3d30e29992891ddf3fddb566dbc485ad707eb35e6474b8ad9ebe1143', 'voxel'],
+           'GeomSimAbstract': ['9f9cef2df87eb551a2062cc501e78b8a53d110e739b5457622cd0f1797f439fa', 'abstract'],
+           'GeomSimDiscrete': ['8e8a6b4a1be69fd70c9be08d7789628a1986928b3f533d477f22dc1aa88d5579', 'discrete'],
+           'GeomSimDiscreteModeling': ['483ad15c37647688e8c9b7e84b6c98f66f43bad37adcab54d60b78a348679a32', 'discrete'],
+           'GeomSimAcis': ['c375a01c086e3a01b27585dff6dd94acf2dff27e54e168c69515e2b7364ae2cf', 'acis'],
+           'GeomSim': ['4a09ca7a2eb54092cea58f56e8ae5a56e2bc5d2f53b8aebca9ac24d4d0c996c7', 'base'],
+           'ParallelMeshSim': ['f0b4136346668bba3998f5dc21468160897e7abe9bbb0fec43a05444968933ad', 'parallelmesh'],
+           'FieldSim': ['28a3788c63b4750b50309ba7876997e5623bb00fb3e22fdf8f66126a29f6c618', 'base'],
+           'GeomSimParasolid': ['f769e7d91a5d8023c61255c97ffb16823f5161a537bb93d236681d7a80a2c9fd', 'parasolid'],
+           'GeomSimAdvanced': ['67e7b68d794d8ff564353fdddd54dc08fbdb01cef99ee9779763cdcdb4d6e656', 'advmodel'],
+           'ParallelMeshSimAdapt': ['2948739c44b363f7360f77133f637b1198314f9da591ebd4cc11d81dc1889a00', 'paralleladapt'],
+           'MeshSimAdapt': ['245b6fd49c2cc3f51c474f2429cb0f8ab0387d610d1f3c0434f4069d181bd024', 'base'],
+           'MeshSimCrack': ['545c3e151a3b246ce180833c07149062ca4002f16ecd94ffbd64fd1a325b020b', 'crack'],
+           'MeshSimAdvanced': ['dd8f9d684e0bd1acf6c7fed7d40b25084b65689b27881e2c4104c69aea566cea', 'adv'],
+           'MeshSim': ['0e638eafc6eb3d695d6b29dba1f15fa09b6d48b4fe5f9ea806c884d6824b11eb', 'base'],
+        }
+    },
+    {
+    'version': '2023.1-230428dev',
+    'components': {
+       'msparalleladapt': ['16c886fe9556b90fea99e2b76b9b679cd2f044ac73764939881361009df7776d', 'paralleladapt'],
+       'pskrnl': ['e852750446c2ca98d0c8b47d83d8dcd087a2c10b0a6683a878d9eba4c167b59a', 'parasolid'],
+       'msadv': ['ccd3e2f69cf1ca637b0fae0ae1dc8d16e73569ad51cf65e667d262a8bcef0e00', 'adv'],
+       'gmcore': ['b2dfebf01755437ea20942d91177ced1c5445d8f868d8b8023bfb49682ded11b', 'base'],
+       'psint': ['b91d28606182bf1efe286708da43d57d00dd482f06ee8cb0ade3f6e53c73f164', 'parasolid'],
+       'mscrack': ['5a70fd3ea9b4dfca91d142c10820d0f8935fa85bfaab5ca14070f1dab470ea13', 'crack'],
+       'aciskrnl': ['2f0c328ffde7bea1a735ae2609f9395e70630d8d4eb51bc34934c0d6c3d58753', 'acis'],
+       'gmadv': ['007c5422350c48b3b072d68d44dcd4832245565119e3041ffb9ac3d67b4dfd22', 'advmodel'],
+       'discrete': ['beec74b4b01c735736a39ad1a7f58b380717eb07bc6aa89287a5ad2679053682', 'discrete'],
+       'msparallelmesh': ['5d5db7e62893f2dce8ce85b3601784799654b5cea2f87a05e30563d5f7c55148', 'parallelmesh'],
+       'gmvoxel': ['9348c3445ce6cdff39fa801818fe9a320615757981de75dee415aa1197cb231f', 'voxel'],
+       'fdcore': ['d3291a9da8e3ee9fb9ac373e4ceca701881d2ada04734718b42fc2074d1b77fb', 'base'],
+       'msadapt': ['b5d33b4896a17ed13c9e4961e9f41c55683935eec266aa9545a71574706c2aa3', 'base'],
+       'gmabstract': ['3b85b3949f84eab105cb8775f582431f341d0f956c501017213bc2faeb897fd9', 'abstract'],
+       'mscore': ['708dbafb07e0bdccc2e820f18e9019eceb49bff39ae729c11bf930f003acadd2', 'base'],
+       },
+    'docs': {
+       'GeomSimAbstract': ['af057e1f2f3e071fe9eacee5fbd48309682bfd04c7b0c879bd8612cbc34e791b', 'abstract'],
+       'GeomSimDiscrete': ['52d29bb2820f9643b8c233b0f6c3509acb9532bbab18ce9bcc437fb1a8e987fe', 'discrete'],
+       'GeomSim': ['539fea7130c62aaa313cc8414628bb68f66277d7d20c3320d4ed6c3e46bcd398', 'base'],
+       'GeomSimParasolid': ['c54888b3bad1604dff6c26091554239a47e268d185169d630c55485a3e62ffde', 'parasolid'],
+       'ParallelMeshSim': ['5541a0b50b66adcbb55f2043b54d3d6a346b51876e15dc6cc317589e2b3de505', 'parallelmesh'],
+       'ParallelMeshSimAdapt': ['ae4f010223cceb9ff4771e3c333ec81d5a471a1b71dccfbcdedcc526970f429d', 'paralleladapt'],
+       'GeomSimAcis': ['567728de91e5cd310e5d6ae4ec3e8fe354a02952ca6f96072ef2f5acd17c435c', 'acis'],
+       'GeomSimVoxel': ['8ed2f0ccde70fb4f9e35a74de4d9584ec778eca16ab00f17acf9603c4831572f', 'voxel'],
+       'FieldSim': ['420c06fc0867fc7dc5d6c2bdf9eb6abd5116a9c5cb3427286ebd17def1b7ec6d', 'base'],
+       'MeshSimAdvanced': ['3c9ff434e6c101dfe712c0943aa6beab8d47fdc6735ab5df4a154453f949e5b7', 'adv'],
+       'GeomSimAdvanced': ['ab829df31bb690073a761abc69be3e24172b811b0ba946beef3aa4491e1af2ae', 'advmodel'],
+       'GeomSimDiscreteModeling': ['3f620a3df57060d4c063a6f236e709884a3c67dcac763aa797cdbb81b8d14bda', 'discrete'],
+       'MeshSimCrack': ['4e1cb0f4d073a7a59998c3099ccb6346ca66746cca3080b734b593c0745266a1', 'crack'],
+       'MeshSimAdapt': ['ed3350b849fd7c1a220815b95a4af3c6c822f3efc53e847217da03b9de15256b', 'base'],
+       'MeshSim': ['40eee3108c01f299d16c8de8583cbffbed54af2ecf135a8b6fec046b796b4502', 'base'],
+       }
+    },
+    {
+    'version': '2023.0-230317dev',
+    'components': {
+       'gmadv': ['d966d5e99fc395647670a4b03725b4049bb59f6bf8a87e908125270d0bbd6cb7', 'advmodel'],
+       'gmvoxel': ['c51b71ae113dc6bf1aa7af6b8cd55372a96f365eaec39f7e2dbf2551682f39a6', 'voxel'],
+       'msadapt': ['7340427d63f029862373290d622bba7227d24b3bbee7872458d0f9d20e34ccd5', 'base'],
+       'pskrnl': ['33d09f267811fc98821418ad47c37fef2ea1b60cdfa2f8b20dddd0a27daaa726', 'parasolid'],
+       'gmcore': ['4cfe35f3a37372735a433504f3f5731799b8b83413a3f3fb1dbcb8d288123322', 'base'],
+       'fdcore': ['d31a2a6728380d30864a56d31f709efcd0f2874c3c651e8d7740b79820589c00', 'base'],
+       'aciskrnl': ['562f69d82199bfc3db7575ec502e05115d6a6b8684a236d932f5d59fe28e03b0', 'acis'],
+       'discrete': ['879e74bc7f7fb9832e64012ea9924f08c012f1e8b06a3e9c0b660c03e2969c61', 'discrete'],
+       'msadv': ['69d052e4557d2729b85873a2fdf4cf235388399798a61b3dff32337c86a5e916', 'adv'],
+       'psint': ['e26a3b93a0f32e3a3734954046a40c85bbf95b579774b0e723ad17a3d52b1595', 'parasolid'],
+       'msparallelmesh': ['c5eb773ae41254ba39939f7215c63b703ada8fd5fdb87280b88a7965f90c39bf', 'parallelmesh'],
+       'mscore': ['85a4750995b37acfe05364d8a17537d39a70e8ae7cfa4aaf8b768f0fc12d7a39', 'base'],
+       'gmabstract': ['690c3e9cea7c979efa160ba928822fa8c4d36626449855a8ff393f2e7915ef53', 'abstract'],
+       'msparalleladapt': ['dfefbd86aaaadf8a00d841b3268550e93b14ef033dcb1863e0a27b536580f6cf', 'paralleladapt'],
+       },
+    'docs': {
+       'GeomSimDiscreteModeling': ['f9f80b614576af0b9f590fae4611ef4bb08798ccfb408a274ca292fcd280b514', 'discrete'],
+       'GeomSimVoxel': ['5f6afdaf1a4f07eda0eee6b122699f5acfc92419aeee17a11b10a58e2d52f318', 'voxel'],
+       'GeomSimAdvanced': ['42a341e5d4b8cf96685dffa2a6b50455c5d522e2f5556e9b1c4d5fd909d46bfc', 'advmodel'],
+       'ParallelMeshSimAdapt': ['ffb8ea0dcf5ad0c04de6fa0a392c5b9f670c1d6d28408f0dd579af9bbbdc5a4e', 'paralleladapt'],
+       'MeshSimAdvanced': ['1a51b56f2d2735ad6bb9c3a03ec2a4c3f8352a8b6bd468ab86b0dc1a4151869d', 'adv'],
+       'GeomSimParasolid': ['2948d33bbe4fccff10360627ebd05ef4d488e4a0dbf39acc635ee6c0b3297dc3', 'parasolid'],
+       'GeomSim': ['4eeb717ab86c1654bf084bb8451ae60a3aaceab78176239c221d23ce37709ba1', 'base'],
+       'MeshSimAdapt': ['3085154835abf6f95f3d800e2def96b1aa9351244db350579bb3be66141dc759', 'base'],
+       'ParallelMeshSim': ['1c3c586a2046d7603865a402828756d9ddf1baa3894e012444d670482d22fce2', 'parallelmesh'],
+       'GeomSimAcis': ['51eee6defd24c3cb1837c6db22ff21036586204c0752da3a675358110b7097d2', 'acis'],
+       'MeshSim': ['2b7a9b0303ae95c4ac89cf628f6db42ab8b71fe7193736e0ccb4de02b0276241', 'base'],
+       'GeomSimAbstract': ['8d9578e94187b4d3a79b03dec8606d525325dfab65b6e73f41acb1dd0494d002', 'abstract'],
+       'GeomSimDiscrete': ['9b83735bb2cde1d17699ddc272fe8de2cb6a68c24c51d655ea5856c6c60e9791', 'discrete'],
+       'FieldSim': ['55f5cea7425aeab3032bb4a5e22a681272a7e7e5d8a11ffcf93606e3667625be', 'base'],
+       }
+    },
+    {
     'version': '2023.0-230303dev',
     'components': {
        'msparalleladapt': ['91485e2752ee3a10ff937a857213194e1b0e63f729345f077b8dcc9856e3b4f8', 'paralleladapt'],
@@ -632,19 +741,25 @@ class SimmetrixSimmodsuite(Package):
     license_required = True
     license_vars     = ['SIM_LICENSE_FILE']
 
-    variant('base', default=True, description='enable the base components')
-    variant('advmodel', default=False, description='enable advaced modeling')
-    variant('abstract', default=False, description='enable abstract modeling')
-    variant('voxel', default=False, description='enable voxel modeling')
-    variant('discrete', default=False, description='enable discrete modeling')
-    variant('acis', default=False, description='enable acis modeling')
-    variant('parasolid', default=False, description='enable parasolid modeling')
-    variant('opencascade', default=False, when='@16.0-220312:', description='enable opencascade modeling')
-    variant('granite', default=False, description='enable granite modeling')
-    variant('import', default=False, description='enable import modeling')
-    variant('adv', default=False, description='enable advanced meshing')
-    variant('parallelmesh', default=False, description='enable parallel meshing')
-    variant('paralleladapt', default=False, description='enable parallel adaptation')
+    variant("base", default=True, description="enable the base components")
+    variant("crack", default=True, description="enable the meshsim crack components")
+    variant("advmodel", default=False, description="enable advaced modeling")
+    variant("abstract", default=False, description="enable abstract modeling")
+    variant("voxel", default=False, description="enable voxel modeling")
+    variant("discrete", default=False, description="enable discrete modeling")
+    variant("acis", default=False, description="enable acis modeling")
+    variant("parasolid", default=False, description="enable parasolid modeling")
+    variant(
+        "opencascade",
+        default=False,
+        when="@16.0-220312:",
+        description="enable opencascade modeling",
+    )
+    variant("granite", default=False, description="enable granite modeling")
+    variant("import", default=False, description="enable import modeling")
+    variant("adv", default=False, description="enable advanced meshing")
+    variant("parallelmesh", default=False, description="enable parallel meshing")
+    variant("paralleladapt", default=False, description="enable parallel adaptation")
 
     depends_on('mpi')
 
