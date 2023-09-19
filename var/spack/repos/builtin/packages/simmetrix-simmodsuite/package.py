@@ -803,7 +803,7 @@ class SimmetrixSimmodsuite(Package):
         if not spec.satisfies('platform=linux'):
             raise InstallError('Only the linux platform is supported')
         source_path = self.stage.source_path
-        for release in simmodsuite_releases():
+        for release in RELEASES:
             simversion = release['version']
             if simversion != spec.version.string:
                 continue
