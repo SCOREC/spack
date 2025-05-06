@@ -1,22 +1,37 @@
-# Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
-# Spack Project Developers. See the top-level COPYRIGHT file for details.
+# Copyright Spack Project Developers. See COPYRIGHT file for details.
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 import collections.abc
 import contextlib
+import fnmatch
 import functools
-import inspect
 import itertools
 import os
 import re
 import sys
 import traceback
+import types
+import typing
+import warnings
 from datetime import datetime, timedelta
-from typing import Any, Callable, Iterable, List, Tuple
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Generic,
+    Iterable,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 # Ignore emacs backups when listing modules
-ignore_modules = [r"^\.#", "~$"]
+ignore_modules = r"^\.#|~$"
 
 
 def index_by(objects, *funcs):
@@ -71,7 +86,7 @@ def index_by(objects, *funcs):
     if isinstance(f, str):
         f = lambda x: getattr(x, funcs[0])
     elif isinstance(f, tuple):
-        f = lambda x: tuple(getattr(x, p) for p in funcs[0])
+        f = lambda x: tuple(getattr(x, p, None) for p in funcs[0])
 
     result = {}
     for o in objects:
@@ -84,64 +99,11 @@ def index_by(objects, *funcs):
     return result
 
 
-def caller_locals():
-    """This will return the locals of the *parent* of the caller.
-    This allows a function to insert variables into its caller's
-    scope.  Yes, this is some black magic, and yes it's useful
-    for implementing things like depends_on and provides.
-    """
-    # Passing zero here skips line context for speed.
-    stack = inspect.stack(0)
-    try:
-        return stack[2][0].f_locals
-    finally:
-        del stack
-
-
-def get_calling_module_name():
-    """Make sure that the caller is a class definition, and return the
-    enclosing module's name.
-    """
-    # Passing zero here skips line context for speed.
-    stack = inspect.stack(0)
-    try:
-        # Make sure locals contain __module__
-        caller_locals = stack[2][0].f_locals
-    finally:
-        del stack
-
-    if "__module__" not in caller_locals:
-        raise RuntimeError(
-            "Must invoke get_calling_module_name() " "from inside a class definition!"
-        )
-
-    module_name = caller_locals["__module__"]
-    base_name = module_name.split(".")[-1]
-    return base_name
-
-
-def attr_required(obj, attr_name):
-    """Ensure that a class has a required attribute."""
-    if not hasattr(obj, attr_name):
-        raise RequiredAttributeError(
-            "No required attribute '%s' in class '%s'" % (attr_name, obj.__class__.__name__)
-        )
-
-
 def attr_setdefault(obj, name, value):
     """Like dict.setdefault, but for objects."""
     if not hasattr(obj, name):
         setattr(obj, name, value)
     return getattr(obj, name)
-
-
-def has_method(cls, name):
-    for base in inspect.getmro(cls):
-        if base is object:
-            continue
-        if name in base.__dict__:
-            return True
-    return False
 
 
 def union_dicts(*dicts):
@@ -208,19 +170,22 @@ def list_modules(directory, **kwargs):
     order."""
     list_directories = kwargs.setdefault("directories", True)
 
-    for name in os.listdir(directory):
-        if name == "__init__.py":
-            continue
+    ignore = re.compile(ignore_modules)
 
-        path = os.path.join(directory, name)
-        if list_directories and os.path.isdir(path):
-            init_py = os.path.join(path, "__init__.py")
-            if os.path.isfile(init_py):
-                yield name
+    with os.scandir(directory) as it:
+        for entry in it:
+            if entry.name == "__init__.py" or entry.name == "__pycache__":
+                continue
 
-        elif name.endswith(".py"):
-            if not any(re.search(pattern, name) for pattern in ignore_modules):
-                yield re.sub(".py$", "", name)
+            if (
+                list_directories
+                and entry.is_dir()
+                and os.path.isfile(os.path.join(entry.path, "__init__.py"))
+            ):
+                yield entry.name
+
+            elif entry.name.endswith(".py") and entry.is_file() and not ignore.search(entry.name):
+                yield entry.name[:-3]  # strip .py
 
 
 def decorator_with_or_without_args(decorator):
@@ -267,8 +232,8 @@ def key_ordering(cls):
         value.__name__ = name
         setattr(cls, name, value)
 
-    if not has_method(cls, "_cmp_key"):
-        raise TypeError("'%s' doesn't define _cmp_key()." % cls.__name__)
+    if not hasattr(cls, "_cmp_key"):
+        raise TypeError(f"'{cls.__name__}' doesn't define _cmp_key().")
 
     setter("__eq__", lambda s, o: (s is o) or (o is not None and s._cmp_key() == o._cmp_key()))
     setter("__lt__", lambda s, o: o is not None and s._cmp_key() < o._cmp_key())
@@ -418,8 +383,8 @@ def lazy_lexicographic_ordering(cls, set_hash=True):
         TypeError: If the class does not have a ``_cmp_iter`` method
 
     """
-    if not has_method(cls, "_cmp_iter"):
-        raise TypeError("'%s' doesn't define _cmp_iter()." % cls.__name__)
+    if not hasattr(cls, "_cmp_iter"):
+        raise TypeError(f"'{cls.__name__}' doesn't define _cmp_iter().")
 
     # comparison operators are implemented in terms of lazy_eq and lazy_lt
     def eq(self, other):
@@ -472,81 +437,38 @@ def lazy_lexicographic_ordering(cls, set_hash=True):
     return cls
 
 
+K = TypeVar("K")
+V = TypeVar("V")
+
+
 @lazy_lexicographic_ordering
-class HashableMap(collections.abc.MutableMapping):
+class HashableMap(typing.MutableMapping[K, V]):
     """This is a hashable, comparable dictionary.  Hash is performed on
     a tuple of the values in the dictionary."""
 
     __slots__ = ("dict",)
 
     def __init__(self):
-        self.dict = {}
+        self.dict: Dict[K, V] = {}
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: K) -> V:
         return self.dict[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: K, value: V) -> None:
         self.dict[key] = value
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[K]:
         return iter(self.dict)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dict)
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: K) -> None:
         del self.dict[key]
 
     def _cmp_iter(self):
         for _, v in sorted(self.items()):
             yield v
-
-    def copy(self):
-        """Type-agnostic clone method.  Preserves subclass type."""
-        # Construct a new dict of my type
-        self_type = type(self)
-        clone = self_type()
-
-        # Copy everything from this dict into it.
-        for key in self:
-            clone[key] = self[key].copy()
-        return clone
-
-
-def in_function(function_name):
-    """True if the caller was called from some function with
-    the supplied Name, False otherwise."""
-    stack = inspect.stack()
-    try:
-        for elt in stack[2:]:
-            if elt[3] == function_name:
-                return True
-        return False
-    finally:
-        del stack
-
-
-def check_kwargs(kwargs, fun):
-    """Helper for making functions with kwargs.  Checks whether the kwargs
-    are empty after all of them have been popped off.  If they're
-    not, raises an error describing which kwargs are invalid.
-
-    Example::
-
-       def foo(self, **kwargs):
-           x = kwargs.pop('x', None)
-           y = kwargs.pop('y', None)
-           z = kwargs.pop('z', None)
-           check_kwargs(kwargs, self.foo)
-
-       # This raises a TypeError:
-       foo(w='bad kwarg')
-    """
-    if kwargs:
-        raise TypeError(
-            "'%s' is an invalid keyword argument for function %s()."
-            % (next(iter(kwargs)), fun.__name__)
-        )
 
 
 def match_predicate(*args):
@@ -764,11 +686,6 @@ def pretty_seconds(seconds):
     return pretty_seconds_formatter(seconds)(seconds)
 
 
-class RequiredAttributeError(ValueError):
-    def __init__(self, message):
-        super().__init__(message)
-
-
 class ObjectWrapper:
     """Base class that wraps an object. Derived classes can add new behavior
     while staying undercover.
@@ -797,14 +714,24 @@ class ObjectWrapper:
 
 
 class Singleton:
-    """Simple wrapper for lazily initialized singleton objects."""
+    """Wrapper for lazily initialized singleton objects."""
 
-    def __init__(self, factory):
+    def __init__(self, factory: Callable[[], object]):
         """Create a new singleton to be inited with the factory function.
 
+        Most factories will simply create the object to be initialized and
+        return it.
+
+        In some cases, e.g. when bootstrapping some global state, the singleton
+        may need to be initialized incrementally. If the factory returns a generator
+        instead of a regular object, the singleton will assign each result yielded by
+        the generator to the singleton instance. This allows methods called by
+        the factory in later stages to refer back to the singleton.
+
         Args:
-            factory (function): function taking no arguments that
-                creates the singleton instance.
+            factory (function): function taking no arguments that creates the
+                singleton instance.
+
         """
         self.factory = factory
         self._instance = None
@@ -812,7 +739,16 @@ class Singleton:
     @property
     def instance(self):
         if self._instance is None:
-            self._instance = self.factory()
+            instance = self.factory()
+
+            if isinstance(instance, types.GeneratorType):
+                # if it's a generator, assign every value
+                for value in instance:
+                    self._instance = value
+            else:
+                # if not, just assign the result like a normal singleton
+                self._instance = instance
+
         return self._instance
 
     def __getattr__(self, name):
@@ -841,6 +777,30 @@ class Singleton:
 
     def __repr__(self):
         return repr(self.instance)
+
+
+def get_entry_points(*, group: str):
+    """Wrapper for ``importlib.metadata.entry_points``
+
+    Args:
+        group: entry points to select
+
+    Returns:
+        EntryPoints for ``group`` or empty list if unsupported
+    """
+
+    try:
+        import importlib.metadata  # type: ignore  # novermin
+    except ImportError:
+        return []
+
+    try:
+        return importlib.metadata.entry_points(group=group)
+    except TypeError:
+        # Prior to Python 3.10, entry_points accepted no parameters and always
+        # returned a dictionary of entry points, keyed by group.  See
+        # https://docs.python.org/3/library/importlib.metadata.html#entry-points
+        return importlib.metadata.entry_points().get(group, [])
 
 
 def load_module_from_file(module_name, module_path):
@@ -911,39 +871,34 @@ def uniq(sequence):
     return uniq_list
 
 
-def star(func):
-    """Unpacks arguments for use with Multiprocessing mapping functions"""
-
-    def _wrapper(args):
-        return func(*args)
-
-    return _wrapper
-
-
-class Devnull:
-    """Null stream with less overhead than ``os.devnull``.
-
-    See https://stackoverflow.com/a/2929954.
-    """
-
-    def write(self, *_):
-        pass
-
-
-def elide_list(line_list, max_num=10):
+def elide_list(line_list: List[str], max_num: int = 10) -> List[str]:
     """Takes a long list and limits it to a smaller number of elements,
     replacing intervening elements with '...'.  For example::
 
-        elide_list([1,2,3,4,5,6], 4)
+        elide_list(["1", "2", "3", "4", "5", "6"], 4)
 
     gives::
 
-        [1, 2, 3, '...', 6]
+        ["1", "2", "3", "...", "6"]
     """
     if len(line_list) > max_num:
-        return line_list[: max_num - 1] + ["..."] + line_list[-1:]
-    else:
-        return line_list
+        return [*line_list[: max_num - 1], "...", line_list[-1]]
+    return line_list
+
+
+if sys.version_info >= (3, 9):
+    PatternStr = re.Pattern[str]
+    PatternBytes = re.Pattern[bytes]
+else:
+    PatternStr = typing.Pattern[str]
+    PatternBytes = typing.Pattern[bytes]
+
+
+def fnmatch_translate_multiple(named_patterns: Dict[str, str]) -> str:
+    """Similar to ``fnmatch.translate``, but takes an ordered dictionary where keys are pattern
+    names, and values are filename patterns. The output is a regex that matches any of the
+    patterns in order, and named capture groups are used to identify which pattern matched."""
+    return "|".join(f"(?P<{n}>{fnmatch.translate(p)})" for n, p in named_patterns.items())
 
 
 @contextlib.contextmanager
@@ -958,18 +913,12 @@ class UnhashableArguments(TypeError):
     """Raise when an @memoized function receives unhashable arg or kwarg values."""
 
 
-def enum(**kwargs):
-    """Return an enum-like class.
-
-    Args:
-        **kwargs: explicit dictionary of enums
-    """
-    return type("Enum", (object,), kwargs)
+T = TypeVar("T")
 
 
 def stable_partition(
-    input_iterable: Iterable, predicate_fn: Callable[[Any], bool]
-) -> Tuple[List[Any], List[Any]]:
+    input_iterable: Iterable[T], predicate_fn: Callable[[T], bool]
+) -> Tuple[List[T], List[T]]:
     """Partition the input iterable according to a custom predicate.
 
     Args:
@@ -981,12 +930,13 @@ def stable_partition(
         Tuple of the list of elements evaluating to True, and
         list of elements evaluating to False.
     """
-    true_items, false_items = [], []
+    true_items: List[T] = []
+    false_items: List[T] = []
     for item in input_iterable:
         if predicate_fn(item):
             true_items.append(item)
-            continue
-        false_items.append(item)
+        else:
+            false_items.append(item)
     return true_items, false_items
 
 
@@ -996,6 +946,21 @@ def ensure_last(lst, *elements):
     Raises ``ValueError`` if any ``elements`` are not already in ``lst``."""
     for elt in elements:
         lst.append(lst.pop(lst.index(elt)))
+
+
+class Const:
+    """Class level constant, raises when trying to set the attribute"""
+
+    __slots__ = ["value"]
+
+    def __init__(self, value):
+        self.value = value
+
+    def __get__(self, instance, owner):
+        return self.value
+
+    def __set__(self, instance, value):
+        raise TypeError(f"Const value does not support assignment [value={self.value}]")
 
 
 class TypedMutableSequence(collections.abc.MutableSequence):
@@ -1057,11 +1022,8 @@ class GroupedExceptionHandler:
     def grouped_message(self, with_tracebacks: bool = True) -> str:
         """Print out an error message coalescing all the forwarded errors."""
         each_exception_message = [
-            "{0} raised {1}: {2}{3}".format(
-                context,
-                exc.__class__.__name__,
-                exc,
-                "\n{0}".format("".join(tb)) if with_tracebacks else "",
+            "\n\t{0} raised {1}: {2}\n{3}".format(
+                context, exc.__class__.__name__, exc, f"\n{''.join(tb)}" if with_tracebacks else ""
             )
             for context, exc, tb in self.exceptions
         ]
@@ -1091,14 +1053,147 @@ class GroupedExceptionForwarder:
         return True
 
 
-class classproperty:
+ClassPropertyType = TypeVar("ClassPropertyType")
+
+
+class classproperty(Generic[ClassPropertyType]):
     """Non-data descriptor to evaluate a class-level property. The function that performs
-    the evaluation is injected at creation time and take an instance (could be None) and
-    an owner (i.e. the class that originated the instance)
+    the evaluation is injected at creation time and takes an owner (i.e., the class that
+    originated the instance).
     """
 
-    def __init__(self, callback):
+    def __init__(self, callback: Callable[[Any], ClassPropertyType]) -> None:
         self.callback = callback
 
-    def __get__(self, instance, owner):
+    def __get__(self, instance, owner) -> ClassPropertyType:
         return self.callback(owner)
+
+
+#: A type alias that represents either a classproperty descriptor or a constant value of the same
+#: type. This allows derived classes to override a computed class-level property with a constant
+#: value while retaining type compatibility.
+ClassProperty = Union[ClassPropertyType, classproperty[ClassPropertyType]]
+
+
+class DeprecatedProperty:
+    """Data descriptor to error or warn when a deprecated property is accessed.
+
+    Derived classes must define a factory method to return an adaptor for the deprecated
+    property, if the descriptor is not set to error.
+    """
+
+    __slots__ = ["name"]
+
+    #: 0 - Nothing
+    #: 1 - Warning
+    #: 2 - Error
+    error_lvl = 0
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+
+        if self.error_lvl == 1:
+            warnings.warn(
+                f"accessing the '{self.name}' property of '{instance}', which is deprecated"
+            )
+        elif self.error_lvl == 2:
+            raise AttributeError(f"cannot access the '{self.name}' attribute of '{instance}'")
+
+        return self.factory(instance, owner)
+
+    def __set__(self, instance, value):
+        raise TypeError(
+            f"the deprecated property '{self.name}' of '{instance}' does not support assignment"
+        )
+
+    def factory(self, instance, owner):
+        raise NotImplementedError("must be implemented by derived classes")
+
+
+KT = TypeVar("KT")
+VT = TypeVar("VT")
+
+
+class PriorityOrderedMapping(Mapping[KT, VT]):
+    """Mapping that iterates over key according to an integer priority. If the priority is
+    the same for two keys, insertion order is what matters.
+
+    The priority is set when the key/value pair is added. If not set, the highest current priority
+    is used.
+    """
+
+    _data: Dict[KT, VT]
+    _priorities: List[Tuple[int, KT]]
+
+    def __init__(self) -> None:
+        self._data = {}
+        # Tuple of (priority, key)
+        self._priorities = []
+
+    def __getitem__(self, key: KT) -> VT:
+        return self._data[key]
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __iter__(self):
+        yield from (key for _, key in self._priorities)
+
+    def __reversed__(self):
+        yield from (key for _, key in reversed(self._priorities))
+
+    def reversed_keys(self):
+        """Iterates over keys from the highest priority, to the lowest."""
+        return reversed(self)
+
+    def reversed_values(self):
+        """Iterates over values from the highest priority, to the lowest."""
+        yield from (self._data[key] for _, key in reversed(self._priorities))
+
+    def _highest_priority(self) -> int:
+        if not self._priorities:
+            return 0
+        result, _ = self._priorities[-1]
+        return result
+
+    def add(self, key: KT, *, value: VT, priority: Optional[int] = None) -> None:
+        """Adds a key/value pair to the mapping, with a specific priority.
+
+        If the priority is None, then it is assumed to be the highest priority value currently
+        in the container.
+
+        Raises:
+              ValueError: when the same priority is already in the mapping
+        """
+        if priority is None:
+            priority = self._highest_priority()
+
+        if key in self._data:
+            self.remove(key)
+
+        self._priorities.append((priority, key))
+        # We rely on sort being stable
+        self._priorities.sort(key=lambda x: x[0])
+        self._data[key] = value
+        assert len(self._data) == len(self._priorities)
+
+    def remove(self, key: KT) -> VT:
+        """Removes a key from the mapping.
+
+        Returns:
+            The value associated with the key being removed
+
+        Raises:
+            KeyError: if the key is not in the mapping
+        """
+        if key not in self._data:
+            raise KeyError(f"cannot find {key}")
+
+        popped_item = self._data.pop(key)
+        self._priorities = [(p, k) for p, k in self._priorities if k != key]
+        assert len(self._data) == len(self._priorities)
+        return popped_item

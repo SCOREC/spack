@@ -1,10 +1,9 @@
-# Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
-# Spack Project Developers. See the top-level COPYRIGHT file for details.
+# Copyright Spack Project Developers. See COPYRIGHT file for details.
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
+from typing import Any, Dict
 
-
-properties = {
+properties: Dict[str, Any] = {
     "develop": {
         "type": "object",
         "default": {},
@@ -13,6 +12,7 @@ properties = {
             r"\w[\w-]*": {
                 "type": "object",
                 "additionalProperties": False,
+                "required": ["spec"],
                 "properties": {"spec": {"type": "string"}, "path": {"type": "string"}},
             }
         },

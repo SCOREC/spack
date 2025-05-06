@@ -1,5 +1,4 @@
-% Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
-% Spack Project Developers. See the top-level COPYRIGHT file for details.
+% Copyright Spack Project Developers. See COPYRIGHT file for details.
 %
 % SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
@@ -18,36 +17,77 @@
 { attr("virtual_node", node(0..X-1, Package)) } :- max_dupes(Package, X), virtual(Package).
 
 % Integrity constraints on DAG nodes
-:- attr("root", PackageNode), not attr("node", PackageNode).
-:- attr("version", PackageNode, _), not attr("node", PackageNode), not attr("virtual_node", PackageNode).
-:- attr("node_version_satisfies", PackageNode, _), not attr("node", PackageNode), not attr("virtual_node", PackageNode).
-:- attr("hash", PackageNode, _), not attr("node", PackageNode).
-:- attr("node_platform", PackageNode, _), not attr("node", PackageNode).
-:- attr("node_os", PackageNode, _), not attr("node", PackageNode).
-:- attr("node_target", PackageNode, _), not attr("node", PackageNode).
-:- attr("node_compiler_version", PackageNode, _, _), not attr("node", PackageNode).
-:- attr("variant_value", PackageNode, _, _), not attr("node", PackageNode).
-:- attr("node_flag_compiler_default", PackageNode), not attr("node", PackageNode).
-:- attr("node_flag", PackageNode, _, _), not attr("node", PackageNode).
-:- attr("no_flags", PackageNode, _), not attr("node", PackageNode).
-:- attr("external_spec_selected", PackageNode, _), not attr("node", PackageNode).
-:- attr("depends_on", ParentNode, _, _), not attr("node", ParentNode).
-:- attr("depends_on", _, ChildNode, _), not attr("node", ChildNode).
-:- attr("node_flag_source", ParentNode, _, _), not attr("node", ParentNode).
-:- attr("node_flag_source", _, _, ChildNode), not attr("node", ChildNode).
-:- attr("virtual_node", VirtualNode), not provider(_, VirtualNode), internal_error("virtual node with no provider").
-:- provider(_, VirtualNode), not attr("virtual_node", VirtualNode), internal_error("provider with no virtual node").
-:- provider(PackageNode, _), not attr("node", PackageNode), internal_error("provider with no real node").
+:- attr("root", PackageNode),
+   not attr("node", PackageNode),
+   internal_error("Every root must be a node").
+:- attr("version", PackageNode, _),
+   not attr("node", PackageNode),
+   not attr("virtual_node", PackageNode),
+   internal_error("Only nodes and virtual_nodes can have versions").
+:- attr("node_version_satisfies", PackageNode, _),
+   not attr("node", PackageNode),
+   not attr("virtual_node", PackageNode),
+   internal_error("Only nodes and virtual_nodes can have version satisfaction").
+:- attr("hash", PackageNode, _),
+   not attr("node", PackageNode),
+   internal_error("Only nodes can have hashes").
+:- attr("node_platform", PackageNode, _),
+   not attr("node", PackageNode),
+   internal_error("Only nodes can have platforms").
+:- attr("node_os", PackageNode, _), not attr("node", PackageNode),
+   internal_error("Only nodes can have node_os").
+:- attr("node_target", PackageNode, _), not attr("node", PackageNode),
+   internal_error("Only nodes can have node_target").
+:- attr("variant_value", PackageNode, _, _), not attr("node", PackageNode),
+   internal_error("variant_value true for a non-node").
+:- attr("node_flag", PackageNode, _), not attr("node", PackageNode),
+   internal_error("node_flag assigned for non-node").
+:- attr("external_spec_selected", PackageNode, _), not attr("node", PackageNode),
+   internal_error("external_spec_selected for non-node").
+:- attr("depends_on", ParentNode, _, _), not attr("node", ParentNode),
+   internal_error("non-node depends on something").
+:- attr("depends_on", _, ChildNode, _), not attr("node", ChildNode),
+   internal_error("something depends_on a non-node").
+:- attr("virtual_node", VirtualNode), not provider(_, VirtualNode),
+   internal_error("virtual node with no provider").
+:- provider(_, VirtualNode), not attr("virtual_node", VirtualNode),
+   internal_error("provider with no virtual node").
+:- provider(PackageNode, _), not attr("node", PackageNode),
+   internal_error("provider with no real node").
+:- node_has_variant(PackageNode, _, _), not attr("node", PackageNode),
+   internal_error("node has variant for a non-node").
+:- attr("variant_set", PackageNode, _, _), not attr("node", PackageNode),
+   internal_error("variant_set for a non-node").
+:- variant_is_propagated(PackageNode, _), not attr("node", PackageNode),
+   internal_error("variant_is_propagated for a non-node").
 
-:- attr("root", node(ID, PackageNode)), ID > min_dupe_id, internal_error("root with a non-minimal duplicate ID").
+:- attr("root", node(ID, PackageNode)), ID > min_dupe_id,
+   internal_error("root with a non-minimal duplicate ID").
 
 % Nodes in the "root" unification set cannot depend on non-root nodes if the dependency is "link" or "run"
 :- attr("depends_on", node(min_dupe_id, Package), node(ID, _), "link"), ID != min_dupe_id, unification_set("root", node(min_dupe_id, Package)), internal_error("link dependency out of the root unification set").
 :- attr("depends_on", node(min_dupe_id, Package), node(ID, _), "run"),  ID != min_dupe_id, unification_set("root", node(min_dupe_id, Package)), internal_error("run dependency out of the root unification set").
 
+% Namespaces are statically assigned by a package fact if not otherwise set
+error(100, "{0} does not have a namespace", Package) :- attr("node", node(ID, Package)),
+   not attr("namespace", node(ID, Package), _),
+   internal_error("A node must have a namespace").
+error(100, "{0} cannot come from both {1} and {2} namespaces", Package, NS1, NS2) :- attr("node", node(ID, Package)),
+   attr("namespace", node(ID, Package), NS1),
+   attr("namespace", node(ID, Package), NS2),
+   NS1 != NS2,
+   internal_error("A node cannot have two namespaces").
+
+attr("namespace", node(ID, Package), Namespace) :- attr("namespace_set", node(ID, Package), Namespace).
+attr("namespace", node(ID, Package), Namespace)
+  :- attr("node", node(ID, Package)),
+     not attr("namespace_set", node(ID, Package), _),
+     pkg_fact(Package, namespace(Namespace)).
+
 % Rules on "unification sets", i.e. on sets of nodes allowing a single configuration of any given package
 unify(SetID, PackageName) :- unification_set(SetID, node(_, PackageName)).
-:- 2 { unification_set(SetID, node(_, PackageName)) }, unify(SetID, PackageName).
+:- 2 { unification_set(SetID, node(_, PackageName)) }, unify(SetID, PackageName),
+   internal_error("Cannot have multiple unification sets IDs for one set").
 
 unification_set("root", PackageNode) :- attr("root", PackageNode).
 unification_set(SetID, ChildNode) :- attr("depends_on", ParentNode, ChildNode, Type), Type != "build", unification_set(SetID, ParentNode).
@@ -73,10 +113,12 @@ unification_set(SetID, VirtualNode)
 % as a build dependency.
 %
 % We'll need to relax the rule before we get to actual cross-compilation
-:- depends_on(ParentNode, node(X, Dependency)), depends_on(ParentNode, node(Y, Dependency)), X < Y.
+:- depends_on(ParentNode, node(X, Dependency)), depends_on(ParentNode, node(Y, Dependency)), X < Y,
+   internal_error("Cannot split link/build deptypes for a single edge (yet)").
 
 
 #defined multiple_unification_sets/1.
+#defined runtime/1.
 
 %----
 % Rules to break symmetry and speed-up searches
@@ -102,6 +144,15 @@ unification_set(SetID, VirtualNode)
    max_dupes(Package, X), ID1=0..X-1, ID2=0..X-1, ID2 < ID1,
    internal_error("virtual node skipped id number").
 
+% Prefer to assign lower ID to virtuals associated with a lower penalty provider
+:- not unification_set("root", node(X, Virtual)),
+   not unification_set("root", node(Y, Virtual)),
+   X < Y,
+   provider_weight(_, node(X, Virtual), WeightX),
+   provider_weight(_, node(Y, Virtual), WeightY),
+   WeightY < WeightX.
+
+
 %-----------------------------------------------------------------------------
 % Map literal input specs to facts that drive the solve
 %-----------------------------------------------------------------------------
@@ -109,7 +160,6 @@ unification_set(SetID, VirtualNode)
 % TODO: literals, at the moment, can only influence the "root" unification set. This needs to be extended later.
 
 % Node attributes that have multiple node arguments (usually, only the first argument is a node)
-multiple_nodes_attribute("node_flag_source").
 multiple_nodes_attribute("depends_on").
 multiple_nodes_attribute("virtual_on_edge").
 multiple_nodes_attribute("provider_set").
@@ -123,16 +173,46 @@ trigger_node(TriggerID, Node, Node) :-
   trigger_condition_holds(TriggerID, Node),
   literal(TriggerID).
 
-% Since we trigger the existence of literal nodes from a condition, we need to construct
-% the condition_set/2 manually below
+% Since we trigger the existence of literal nodes from a condition, we need to construct the condition_set/2
 mentioned_in_literal(Root, Mentioned) :- mentioned_in_literal(TriggerID, Root, Mentioned), solve_literal(TriggerID).
-condition_set(node(min_dupe_id, Root), node(min_dupe_id, Mentioned)) :-  mentioned_in_literal(Root, Mentioned).
+literal_node(Root, node(min_dupe_id, Root)) :-  mentioned_in_literal(Root, Root).
+
+1 { literal_node(Root, node(0..Y-1, Mentioned)) : max_dupes(Mentioned, Y) } 1 :-
+  mentioned_in_literal(Root, Mentioned), Mentioned != Root,
+  internal_error("must have exactly one condition_set for literals").
+
+1 { build_dependency_of_literal_node(LiteralNode, node(0..Y-1, BuildDependency)) : max_dupes(BuildDependency, Y) } 1 :-
+  literal_node(Root, LiteralNode),
+  build(LiteralNode),
+  not external(LiteralNode),
+  attr("build_requirement", LiteralNode, build_requirement("node", BuildDependency)).
+
+condition_set(node(min_dupe_id, Root), LiteralNode) :- literal_node(Root, LiteralNode).
+condition_set(LiteralNode, BuildNode) :- build_dependency_of_literal_node(LiteralNode, BuildNode).
+
+:- build_dependency_of_literal_node(LiteralNode, BuildNode),
+   not attr("depends_on", LiteralNode, BuildNode, "build").
 
 % Discriminate between "roots" that have been explicitly requested, and roots that are deduced from "virtual roots"
 explicitly_requested_root(node(min_dupe_id, Package)) :-
   solve_literal(TriggerID),
   trigger_and_effect(Package, TriggerID, EffectID),
   imposed_constraint(EffectID, "root", Package).
+
+
+% Keep track of which nodes are associated with which root DAG
+associated_with_root(RootNode, RootNode) :- attr("root", RootNode).
+
+associated_with_root(RootNode, ChildNode) :-
+   depends_on(ParentNode, ChildNode),
+   associated_with_root(RootNode, ParentNode).
+
+% We cannot have a node in the root condition set, that is not associated with that root
+:- attr("root", RootNode),
+   condition_set(RootNode, node(X, Package)),
+   not virtual(Package),
+   not associated_with_root(RootNode, node(X, Package)),
+   internal_error("nodes in root condition set must be associated with root").
 
 #defined concretize_everything/0.
 #defined literal/1.
@@ -196,6 +276,7 @@ error(100, "Cannot select a single version for virtual '{0}'", Virtual)
 % If we select a deprecated version, mark the package as deprecated
 attr("deprecated", node(ID, Package), Version) :-
      attr("version", node(ID, Package), Version),
+     not external(node(ID, Package)),
      pkg_fact(Package, deprecated_version(Version)).
 
 error(100, "Package '{0}' needs the deprecated version '{1}', and this is not allowed", Package, Version)
@@ -228,6 +309,7 @@ possible_version_weight(node(ID, Package), Weight)
 :- attr("version", node(ID, Package), Version),
    version_weight(node(ID, Package), Weight),
    not pkg_fact(Package, version_declared(Version, Weight, "installed")),
+   not pkg_fact(Package, version_declared(Version, Weight, "installed_git_version")),
    not build(node(ID, Package)),
    internal_error("Build version weight used for reused package").
 
@@ -244,19 +326,16 @@ possible_version_weight(node(ID, Package), Weight)
 { attr("version", node(ID, Package), Version) : pkg_fact(Package, version_satisfies(Constraint, Version)) }
   :- attr("node_version_satisfies", node(ID, Package), Constraint).
 
-% If there is at least a version that satisfy the constraint, impose a lower
-% bound on the choice rule to avoid false positives with the error below
-1 { attr("version", node(ID, Package), Version) : pkg_fact(Package, version_satisfies(Constraint, Version)) }
-  :- attr("node_version_satisfies", node(ID, Package), Constraint),
-     pkg_fact(Package, version_satisfies(Constraint, _)),
-     internal_error("must choose a single version to satisfy version constraints").
-
 % More specific error message if the version cannot satisfy some constraint
 % Otherwise covered by `no_version_error` and `versions_conflict_error`.
-error(10, "Cannot satisfy '{0}@{1}'", Package, Constraint)
+error(1, "Cannot satisfy '{0}@{1}'", Package, Constraint)
   :- attr("node_version_satisfies", node(ID, Package), Constraint),
      attr("version", node(ID, Package), Version),
      not pkg_fact(Package, version_satisfies(Constraint, Version)).
+
+error(10, "Cannot satisfy '{0}@{1}'", Package, Constraint)
+  :- attr("node_version_satisfies", node(ID, Package), Constraint),
+     not attr("version", node(ID, Package), _).
 
 attr("node_version_satisfies", node(ID, Package), Constraint)
   :- attr("version", node(ID, Package), Version),
@@ -306,6 +385,7 @@ trigger_node(ID, node(PackageID, Package), node(VirtualID, Virtual)) :- pkg_fact
 condition_nodes(TriggerID, PackageNode, node(X, A1))
   :- condition_packages(TriggerID, A1),
      condition_set(PackageNode, node(X, A1)),
+     not self_build_requirement(PackageNode, node(X, A1)),
      trigger_node(TriggerID, PackageNode, _).
 
 cannot_hold(TriggerID, PackageNode)
@@ -320,7 +400,7 @@ trigger_condition_holds(ID, RequestorNode) :-
   attr(Name, node(X, A1), A2, A3)     : condition_requirement(ID, Name, A1, A2, A3),     condition_nodes(ID, PackageNode, node(X, A1)), not multiple_nodes_attribute(Name);
   attr(Name, node(X, A1), A2, A3, A4) : condition_requirement(ID, Name, A1, A2, A3, A4), condition_nodes(ID, PackageNode, node(X, A1));
   % Special cases
-  attr("node_flag_source", node(X, A1), A2, node(Y, A3)) : condition_requirement(ID, "node_flag_source", A1, A2, A3), condition_nodes(ID, PackageNode, node(X, A1)), condition_nodes(ID, PackageNode, node(Y, A3));
+  attr("depends_on", node(X, A1), node(Y, A2), A3) : condition_requirement(ID, "depends_on", A1, A2, A3), condition_nodes(ID, PackageNode, node(X, A1)), condition_nodes(ID, PackageNode, node(Y, A2));
   not cannot_hold(ID, PackageNode).
 
 condition_holds(ConditionID, node(X, Package))
@@ -350,28 +430,28 @@ imposed_nodes(EffectID, node(NodeID, Package), node(X, A1))
      pkg_fact(Package, condition_effect(ID, EffectID)),
      imposed_packages(EffectID, A1),
      condition_set(node(NodeID, Package), node(X, A1)),
-     trigger_node(TriggerID, _, node(NodeID, Package)).
+     trigger_node(TriggerID, _, node(NodeID, Package)),
+     % We don't want to add build requirements to imposed nodes, to avoid
+     % unsat problems when we deal with self-dependencies: gcc@14 %gcc@10
+     not self_build_requirement(node(NodeID, Package), node(X, A1)).
+
+self_build_requirement(node(X, Package), node(Y, Package)) :- build_requirement(node(X, Package), node(Y, Package)).
 
 imposed_nodes(ConditionID, PackageNode, node(X, A1))
   :- imposed_packages(ConditionID, A1),
      condition_set(PackageNode, node(X, A1)),
      attr("hash", PackageNode, ConditionID).
 
-:- imposed_packages(ID, A1), impose(ID, PackageNode), not condition_set(PackageNode, node(_, A1)).
-:- imposed_packages(ID, A1), impose(ID, PackageNode), not imposed_nodes(ID, PackageNode, node(_, A1)).
+:- imposed_packages(ID, A1), impose(ID, PackageNode), not condition_set(PackageNode, node(_, A1)),
+   internal_error("Imposing constraint outside of condition set").
+:- imposed_packages(ID, A1), impose(ID, PackageNode), not imposed_nodes(ID, PackageNode, node(_, A1)),
+   internal_error("Imposing constraint outside of imposed_nodes").
 
 % Conditions that hold impose may impose constraints on other specs
 attr(Name, node(X, A1))             :- impose(ID, PackageNode), imposed_constraint(ID, Name, A1),             imposed_nodes(ID, PackageNode, node(X, A1)).
 attr(Name, node(X, A1), A2)         :- impose(ID, PackageNode), imposed_constraint(ID, Name, A1, A2),         imposed_nodes(ID, PackageNode, node(X, A1)), not multiple_nodes_attribute(Name).
 attr(Name, node(X, A1), A2, A3)     :- impose(ID, PackageNode), imposed_constraint(ID, Name, A1, A2, A3),     imposed_nodes(ID, PackageNode, node(X, A1)), not multiple_nodes_attribute(Name).
 attr(Name, node(X, A1), A2, A3, A4) :- impose(ID, PackageNode), imposed_constraint(ID, Name, A1, A2, A3, A4), imposed_nodes(ID, PackageNode, node(X, A1)).
-
-% For node flag sources we need to look at the condition_set of the source, since it is the dependent
-% of the package on which I want to impose the constraint
-attr("node_flag_source", node(X, A1), A2, node(Y, A3))
-  :- impose(ID, node(X, A1)),
-     imposed_constraint(ID, "node_flag_source", A1, A2, A3),
-     condition_set(node(Y, A3), node(X, A1)).
 
 % Provider set is relevant only for literals, since it's the only place where `^[virtuals=foo] bar`
 % might appear in the HEAD of a rule
@@ -388,7 +468,93 @@ provider(ProviderNode, VirtualNode) :- attr("provider_set", ProviderNode, Virtua
 % satisfy the dependency.
 1 { attr("depends_on", node(X, A1), node(0..Y-1, A2), A3) : max_dupes(A2, Y) } 1
   :- impose(ID, node(X, A1)),
-     imposed_constraint(ID, "depends_on", A1, A2, A3).
+     imposed_constraint(ID, "depends_on", A1, A2, A3),
+     internal_error("Build deps must land in exactly one duplicate").
+
+% The rule below accounts for expressions like:
+%
+% root ^dep %compiler
+%
+% where "compiler" is a dependency of "dep", but is enforced by a condition imposed by "root"
+1 { attr("depends_on", node(A1_DUPE_ID, A1), node(0..Y-1, A2), A3) : max_dupes(A2, Y) } 1
+  :- impose(ID, RootNode),
+     unification_set("root", RootNode),
+     condition_set(RootNode, node(A1_DUPE_ID, A1)),
+     not self_build_requirement(RootNode, node(A1_DUPE_ID, A1)),
+     imposed_constraint(ID, "depends_on", A1, A2, A3),
+     internal_error("Build deps must land in exactly one duplicate").
+
+% If the parent is built, then we have a build_requirement on another node. For concrete nodes,
+% or external nodes, we don't since we are trimming their build dependencies.
+1 { attr("depends_on",  node(X, Parent), node(0..Y-1, BuildDependency), "build") : max_dupes(BuildDependency, Y) } 1
+  :- attr("build_requirement", node(X, Parent), build_requirement("node", BuildDependency)),
+     build(node(X, Parent)),
+     not external(node(X, Parent)).
+
+% Concrete nodes
+:- attr("build_requirement", ParentNode, build_requirement("node", BuildDependency)),
+   concrete(ParentNode),
+   not attr("concrete_build_dependency", ParentNode, BuildDependency, _).
+
+:- attr("build_requirement", ParentNode, build_requirement("node_version_satisfies", BuildDependency, Constraint)),
+   attr("concrete_build_dependency", ParentNode, BuildDependency, BuildDependencyHash),
+   not 1 { pkg_fact(BuildDependency, version_satisfies(Constraint, Version)) : hash_attr(BuildDependencyHash, "version", BuildDependency, Version) } 1.
+
+:- attr("build_requirement", ParentNode, build_requirement("provider_set", BuildDependency, Virtual)),
+   attr("concrete_build_dependency", ParentNode, BuildDependency, BuildDependencyHash),
+   attr("virtual_on_build_edge", ParentNode, BuildDependency, Virtual),
+   not 1 { pkg_fact(BuildDependency, version_satisfies(Constraint, Version)) : hash_attr(BuildDependencyHash, "version", BuildDependency, Version) } 1.
+
+% External nodes
+:- attr("build_requirement", ParentNode, build_requirement("node", BuildDependency)),
+   external(ParentNode),
+   not attr("external_build_requirement", ParentNode, build_requirement("node", BuildDependency)).
+
+candidate_external_version(Constraint, BuildDependency, Version)
+  :- attr("build_requirement", ParentNode, build_requirement("node_version_satisfies", BuildDependency, Constraint)),
+     external(ParentNode),
+     pkg_fact(BuildDependency, version_satisfies(Constraint, Version)).
+
+error(100, "External {0} cannot satisfy both {1} and {2}", BuildDependency, LiteralConstraint, ExternalConstraint)
+  :- attr("build_requirement", ParentNode, build_requirement("node_version_satisfies", BuildDependency, LiteralConstraint)),
+     external(ParentNode),
+     attr("external_build_requirement", ParentNode, build_requirement("node_version_satisfies", BuildDependency, ExternalConstraint)),
+     not 1 { pkg_fact(BuildDependency, version_satisfies(ExternalConstraint, Version)) : candidate_external_version(LiteralConstraint, BuildDependency, Version) }.
+
+
+% Asking for gcc@10 %gcc@9 shouldn't give us back an external gcc@10, just because of the hack
+% we have on externals
+:- attr("build_requirement", node(X, Parent), build_requirement("node", BuildDependency)),
+   Parent == BuildDependency,
+   external(node(X, Parent)).
+
+build_requirement(node(X, Parent), node(Y, BuildDependency)) :-
+  attr("depends_on", node(X, Parent), node(Y, BuildDependency), "build"),
+  attr("build_requirement", node(X, Parent), build_requirement("node", BuildDependency)).
+
+1 { virtual_build_requirement(ParentNode, node(0..Y-1, Virtual)) : max_dupes(Virtual, Y) } 1
+  :- attr("dependency_holds", ParentNode, Virtual, "build"),
+     not attr("dependency_holds", ParentNode, Virtual,"link"),
+     not attr("dependency_holds", ParentNode, Virtual,"run"),
+     virtual(Virtual).
+
+attr("virtual_node", VirtualNode)  :- virtual_build_requirement(ParentNode, VirtualNode).
+build_requirement(ParentNode, ProviderNode) :- virtual_build_requirement(ParentNode, VirtualNode), provider(ProviderNode, VirtualNode).
+
+% From cli we can have literal expressions like:
+%
+% root %gcc@12.0 ^dep %gcc@11.2
+%
+% Adding a "build_requirement" is a way to discriminate between the incompatible
+% version constraints on "gcc" in the "imposed_constraint".
+attr("node_version_satisfies", node(X, BuildDependency), Constraint) :-
+  attr("build_requirement", ParentNode, build_requirement("node_version_satisfies", BuildDependency, Constraint)),
+  build_requirement(ParentNode, node(X, BuildDependency)).
+
+
+1 { attr("provider_set", node(X, BuildDependency), node(0..Y-1, Virtual)) : max_dupes(Virtual, Y) } 1 :-
+  attr("build_requirement", ParentNode, build_requirement("provider_set", BuildDependency, Virtual)),
+  build_requirement(ParentNode, node(X, BuildDependency)).
 
 % Reconstruct virtual dependencies for reused specs
 attr("virtual_on_edge", node(X, A1), node(Y, A2), Virtual)
@@ -412,8 +578,8 @@ virtual_condition_holds(node(Y, A2), Virtual)
 % we cannot have additional flag values when we are working with concrete specs
 :- attr("node", node(ID, Package)),
    attr("hash", node(ID, Package), Hash),
-   attr("node_flag", node(ID, Package), FlagType, Flag),
-   not imposed_constraint(Hash, "node_flag", Package, FlagType, Flag),
+   attr("node_flag", node(ID, Package), node_flag(FlagType, Flag, _, _)),
+   not imposed_constraint(Hash, "node_flag", Package, node_flag(FlagType, Flag, _, _)),
    internal_error("imposed hash without imposing all flag values").
 
 #defined condition/2.
@@ -429,8 +595,14 @@ virtual_condition_holds(node(Y, A2), Virtual)
 %-----------------------------------------------------------------------------
 % Concrete specs
 %-----------------------------------------------------------------------------
+
 % if a package is assigned a hash, it's concrete.
 concrete(PackageNode) :- attr("hash", PackageNode, _), attr("node", PackageNode).
+
+:- concrete(PackageNode),
+   depends_on(PackageNode, DependencyNode),
+   not concrete(DependencyNode),
+   not abi_splice_conditions_hold(_, DependencyNode, _, _).
 
 %-----------------------------------------------------------------------------
 % Dependency semantics
@@ -453,10 +625,61 @@ attr("track_dependencies", Node) :- build(Node), not external(Node).
 % this ensures a user can't say `zlib ^libiconv` (neither of which have any
 % dependencies) and get a two-node unconnected graph
 needed(PackageNode) :- attr("root", PackageNode).
-needed(DependencyNode) :- needed(PackageNode), depends_on(PackageNode, DependencyNode).
+needed(ChildNode) :- edge_needed(ParentNode, ChildNode).
+
+edge_needed(ParentNode, node(X, Child)) :- depends_on(ParentNode, node(X, Child)), runtime(Child).
+edge_needed(ParentNode, ChildNode)      :- depends_on(ParentNode, ChildNode)     , concrete(ParentNode).
+
+edge_needed(ParentNode, node(X, Child)) :-
+   depends_on(ParentNode, node(X, Child)),
+   build(ParentNode),
+   attr("dependency_holds", ParentNode, Child, _).
+
+virtual_edge_needed(ParentNode, ChildNode, node(X, Virtual)) :-
+   depends_on(ParentNode, ChildNode),
+   build(ParentNode),
+   node_depends_on_virtual(ParentNode, Virtual),
+   provider(ChildNode, node(X, Virtual)).
+
+virtual_edge_needed(ParentNode, ChildNode, node(X, Virtual)) :-
+   concrete(ParentNode),
+   concrete(ChildNode),
+   provider(ChildNode, node(X, Virtual)),
+   attr("virtual_on_edge", ParentNode, ChildNode, Virtual).
+
+virtual_edge_needed(ParentNode, ChildNode, node(X, Virtual)) :-
+   concrete(ParentNode),
+   abi_splice_conditions_hold(_, ChildNode, _, _),
+   provider(ChildNode, node(X, Virtual)),
+   attr("virtual_on_edge", ParentNode, ChildNode, Virtual).
+
+
+edge_needed(ParentNode, ChildNode)      :- virtual_edge_needed(ParentNode, ChildNode, _).
+provider_needed(ChildNode, VirtualNode) :- virtual_edge_needed(_, ChildNode, VirtualNode).
+provider_needed(ChildNode, VirtualNode) :- attr("virtual_root", VirtualNode), provider(ChildNode, VirtualNode).
+
 error(10, "'{0}' is not a valid dependency for any package in the DAG", Package)
   :- attr("node", node(ID, Package)),
      not needed(node(ID, Package)).
+
+:- depends_on(ParentNode, ChildNode),
+   not edge_needed(ParentNode, ChildNode),
+   build(ParentNode).
+
+:- provider(PackageNode, VirtualNode),
+   not provider_needed(PackageNode, VirtualNode),
+   not attr("virtual_root", VirtualNode).
+
+
+% Extensions depending on each other must all extend the same node (e.g. all Python packages
+% depending on each other must depend on the same Python interpreter)
+error(100, "{0} and {1} must depend on the same {2}", ExtensionParent, ExtensionChild, ExtendeePackage)
+  :- depends_on(ExtensionParent, ExtensionChild),
+     attr("extends", ExtensionParent, ExtendeePackage),
+     depends_on(ExtensionParent, node(X, ExtendeePackage)),
+     depends_on(ExtensionChild,  node(Y, ExtendeePackage)),
+     X != Y.
+
 
 #defined dependency_type/2.
 
@@ -484,14 +707,18 @@ possible_provider_weight(ProviderNode, VirtualNode, 0, "Set on the command line"
 
 % Enforces all virtuals to be provided, if multiple of them are provided together
 error(100, "Package '{0}' needs to provide both '{1}' and '{2}' together, but provides only '{1}'", Package, Virtual1, Virtual2)
-:- condition_holds(ID, node(X, Package)),
+:- % This package provides 2 or more virtuals together
+   condition_holds(ID, node(X, Package)),
    pkg_fact(Package, provided_together(ID, SetID, Virtual1)),
    pkg_fact(Package, provided_together(ID, SetID, Virtual2)),
    Virtual1 != Virtual2,
-   attr("virtual_on_incoming_edges", node(X, Package), Virtual1),
-   not attr("virtual_on_incoming_edges", node(X, Package), Virtual2),
-   attr("virtual_node", node(_, Virtual1)),
-   attr("virtual_node", node(_, Virtual2)).
+   % One node depends on those virtuals AND on this package
+   node_depends_on_virtual(ClientNode, Virtual1),
+   node_depends_on_virtual(ClientNode, Virtual2),
+   depends_on(ClientNode, node(X, Package)),
+   % But this package is a provider of only one of them
+   provider(node(X, Package), node(_, Virtual1)),
+   not provider(node(X, Package), node(_, Virtual2)).
 
 % if a package depends on a virtual, it's not external and we have a
 % provider for that virtual then it depends on the provider
@@ -511,8 +738,22 @@ attr("virtual_on_edge", PackageNode, ProviderNode, Virtual)
      provider(ProviderNode, node(_, Virtual)),
      not external(PackageNode).
 
+% If a virtual node is in the answer set, it must be either a virtual root,
+% or used somewhere
+:- attr("virtual_node", node(_, Virtual)),
+   not attr("virtual_on_incoming_edges", _, Virtual),
+   not attr("virtual_root", node(_, Virtual)),
+   internal_error("virtual node does not match incoming edge").
+
 attr("virtual_on_incoming_edges", ProviderNode, Virtual)
   :- attr("virtual_on_edge", _, ProviderNode, Virtual).
+
+% This is needed to allow requirement on virtuals,
+% when a virtual root is requested
+attr("virtual_on_incoming_edges", ProviderNode, Virtual)
+  :- attr("virtual_root", node(min_dupe_id, Virtual)),
+     attr("root", ProviderNode),
+     provider(ProviderNode, node(min_dupe_id, Virtual)).
 
 % dependencies on virtuals also imply that the virtual is a virtual node
 1 { attr("virtual_node", node(0..X-1, Virtual)) : max_dupes(Virtual, X) }
@@ -522,8 +763,8 @@ attr("virtual_on_incoming_edges", ProviderNode, Virtual)
 % The provider must be selected among the possible providers.
 
 error(100, "'{0}' cannot be a provider for the '{1}' virtual", Package, Virtual)
-  :-  attr("provider_set", node(min_dupe_id, Package), node(min_dupe_id, Virtual)),
-      not virtual_condition_holds( node(min_dupe_id, Package), Virtual).
+  :-  attr("provider_set", node(X, Package), node(Y, Virtual)),
+      not virtual_condition_holds( node(X, Package), Virtual).
 
 error(100, "Cannot find valid provider for virtual {0}", Virtual)
   :- attr("virtual_node", node(X, Virtual)),
@@ -563,7 +804,10 @@ do_not_impose(EffectID, node(X, Package))
    virtual_condition_holds(_, PossibleProvider, Virtual),
    PossibleProvider != ProviderNode,
    explicitly_requested_root(PossibleProvider),
-   not explicitly_requested_root(ProviderNode).
+   not self_build_requirement(PossibleProvider, ProviderNode),
+   not explicitly_requested_root(ProviderNode),
+   not language(Virtual),
+   internal_error("If a root can provide a virtual, it must be the provider").
 
 % A package cannot be the actual provider for a virtual if it does not
 % fulfill the conditions to provide that virtual
@@ -577,25 +821,18 @@ do_not_impose(EffectID, node(X, Package))
 % Virtual dependency weights
 %-----------------------------------------------------------------------------
 
-% A provider may have different possible weights depending on whether it's an external
-% or not, or on preferences expressed in packages.yaml etc. This rule ensures that
+% A provider has different possible weights depending on its preference. This rule ensures that
 % we select the weight, among the possible ones, that minimizes the overall objective function.
 1 { provider_weight(DependencyNode, VirtualNode, Weight) :
     possible_provider_weight(DependencyNode, VirtualNode, Weight, _) } 1
  :- provider(DependencyNode, VirtualNode), internal_error("Package provider weights must be unique").
 
-% A provider that is an external can use a weight of 0
-possible_provider_weight(DependencyNode, VirtualNode, 0, "external")
-  :- provider(DependencyNode, VirtualNode),
-     external(DependencyNode).
-
-% A provider mentioned in the default configuration can use a weight
-% according to its priority in the list of providers
+% Any configured provider has a weight based on index in the preference list
 possible_provider_weight(node(ProviderID, Provider), node(VirtualID, Virtual), Weight, "default")
   :- provider(node(ProviderID, Provider), node(VirtualID, Virtual)),
      default_provider_preference(Virtual, Provider, Weight).
 
-% Any provider can use 100 as a weight, which is very high and discourage its use
+% Any non-configured provider has a default weight of 100
 possible_provider_weight(node(ProviderID, Provider), VirtualNode, 100, "fallback")
   :- provider(node(ProviderID, Provider), VirtualNode).
 
@@ -652,6 +889,16 @@ attr("external_spec_selected", node(ID, Package), LocalIndex) :-
     attr("node", node(ID, Package)),
     not attr("hash", node(ID, Package), _).
 
+% Account for compiler annotation on externals
+:- not attr("root", ExternalNode),
+   attr("external_build_requirement", ExternalNode, build_requirement("node", Compiler)),
+   not node_compiler(_, node(_, Compiler)).
+
+1 { attr("node_version_satisfies", node(X, Compiler), Constraint) : node_compiler(_, node(X, Compiler)) }
+  :- not attr("root", ExternalNode),
+     attr("external_build_requirement", ExternalNode, build_requirement("node", Compiler)),
+     attr("external_build_requirement", ExternalNode, build_requirement("node_version_satisfies", Compiler, Constraint)).
+
 % it cannot happen that a spec is external, but none of the external specs
 % conditions hold.
 error(100, "Attempted to use external for '{0}' which does not satisfy any configured external spec", Package)
@@ -689,28 +936,50 @@ requirement_weight(node(ID, Package), Group, W) :-
   requirement_policy(Package, Group, "one_of"),
   requirement_group_satisfied(node(ID, Package), Group).
 
+ { attr("build_requirement", node(ID, Package), BuildRequirement) : condition_requirement(TriggerID, "build_requirement", Package, BuildRequirement) } :-
+  pkg_fact(Package, condition_trigger(ConditionID, TriggerID)),
+  requirement_group_member(ConditionID, Package, Group),
+  activate_requirement(node(ID, Package), Group),
+  requirement_group(Package, Group).
+
 requirement_group_satisfied(node(ID, Package), X) :-
   1 { condition_holds(Y, node(ID, Package)) : requirement_group_member(Y, Package, X) } ,
   requirement_policy(Package, X, "any_of"),
   activate_requirement(node(ID, Package), X),
   requirement_group(Package, X).
 
-% TODO: the following two choice rules allow the solver to add compiler
+% Do not impose requirements, if the conditional requirement is not active
+do_not_impose(EffectID, node(ID, Package)) :-
+  trigger_condition_holds(TriggerID, node(ID, Package)),
+  pkg_fact(Package, condition_trigger(ConditionID, TriggerID)),
+  pkg_fact(Package, condition_effect(ConditionID, EffectID)),
+  requirement_group_member(ConditionID , Package, RequirementID),
+  not activate_requirement(node(ID, Package), RequirementID).
+
+% When we have a required provider, we need to ensure that the provider/2 facts respect
+% the requirement. This is particularly important for packages that could provide multiple
+% virtuals independently
+required_provider(Provider, Virtual)
+  :- requirement_group_member(ConditionID, Virtual, RequirementID),
+     condition_holds(ConditionID, _),
+     virtual(Virtual),
+     pkg_fact(Virtual, condition_effect(ConditionID, EffectID)),
+     imposed_constraint(EffectID, "node", Provider).
+
+error(1, "Trying to use {0} as a provider for {1}, but {2} is required", Package, Virtual, Provider) :-
+   provider(node(Y, Package), node(X, Virtual)),
+   required_provider(Provider, Virtual),
+   Package != Provider.
+
+% TODO: the following choice rule allows the solver to add compiler
 % flags if their only source is from a requirement. This is overly-specific
 % and should use a more-generic approach like in https://github.com/spack/spack/pull/37180
 
-{ attr("node_flag", node(ID, Package), FlagType, FlagValue) } :-
+{ attr("node_flag", node(ID, Package), NodeFlag) } :-
   requirement_group_member(ConditionID, Package, RequirementID),
   activate_requirement(node(ID, Package), RequirementID),
   pkg_fact(Package, condition_effect(ConditionID, EffectID)),
-  imposed_constraint(EffectID, "node_flag_set", Package, FlagType, FlagValue).
-
-{ attr("node_flag_source", node(NodeID1, Package1), FlagType, node(NodeID2, Package2)) } :-
-  requirement_group_member(ConditionID, Package1, RequirementID),
-  activate_requirement(node(NodeID1, Package1), RequirementID),
-  pkg_fact(Package1, condition_effect(ConditionID, EffectID)),
-  imposed_constraint(EffectID, "node_flag_source", Package1, FlagType, Package2),
-  imposed_nodes(EffectID, node(NodeID2, Package2), node(NodeID1, Package1)).
+  imposed_constraint(EffectID, "node_flag_set", Package, NodeFlag).
 
 requirement_weight(node(ID, Package), Group, W) :-
   W = #min {
@@ -747,89 +1016,135 @@ error(10, Message) :-
 %-----------------------------------------------------------------------------
 % Variant semantics
 %-----------------------------------------------------------------------------
-% a variant is a variant of a package if it is a variant under some condition
-% and that condition holds
-node_has_variant(node(NodeID, Package), Variant) :-
-  pkg_fact(Package, conditional_variant(ID, Variant)),
-  condition_holds(ID, node(NodeID, Package)).
+% Packages define potentially several definitions for each variant, and depending
+% on their attibutes, duplicate nodes for the same package may use different
+% definitions. So the variant logic has several jobs:
+% A. Associate a variant definition with a node, by VariantID
+% B. Associate defaults and attributes (sticky, etc.) for the selected variant ID with the node.
+% C. Once these rules are established for a node, select variant value(s) based on them.
 
-node_has_variant(node(ID, Package), Variant) :-
-  pkg_fact(Package, variant(Variant)),
-  attr("node", node(ID, Package)).
+% A: Selecting a variant definition
 
-% Variant propagation is forwarded to dependencies
-attr("variant_propagation_candidate", PackageNode, Variant, Value, Source) :-
-  attr("node", PackageNode),
-  depends_on(ParentNode, PackageNode),
-  attr("variant_value", node(_, Source), Variant, Value),
-  attr("variant_propagation_candidate", ParentNode, Variant, _, Source).
+% Variant definitions come from package facts in two ways:
+% 1. unconditional variants are always defined on all nodes for a given package
+variant_definition(node(NodeID, Package), Name, VariantID) :-
+  pkg_fact(Package, variant_definition(Name, VariantID)),
+  attr("node", node(NodeID, Package)).
 
-% If the node is a candidate, and it has the variant and value,
-% then those variant and value should be propagated
-attr("variant_propagate", node(ID, Package), Variant, Value, Source) :-
-  attr("variant_propagation_candidate", node(ID, Package), Variant, Value, Source),
-  node_has_variant(node(ID, Package), Variant),
-  pkg_fact(Package, variant_possible_value(Variant, Value)),
-  not attr("variant_set", node(ID, Package), Variant).
+% 2. conditional variants are only defined if the conditions hold for the node
+variant_definition(node(NodeID, Package), Name, VariantID) :-
+  pkg_fact(Package, variant_condition(Name, VariantID, ConditionID)),
+  condition_holds(ConditionID, node(NodeID, Package)).
 
-% Propagate the value, if there is the corresponding attribute
-attr("variant_value", PackageNode, Variant, Value) :- attr("variant_propagate", PackageNode, Variant, Value, _).
+% If there are any definitions for a variant on a node, the variant is "defined".
+variant_defined(PackageNode, Name) :- variant_definition(PackageNode, Name, _).
 
-% If a variant is propagated, we cannot have extraneous values (this is for multi valued variants)
-variant_is_propagated(PackageNode, Variant) :- attr("variant_propagate", PackageNode, Variant, _, _).
-:- variant_is_propagated(PackageNode, Variant),
-   attr("variant_value", PackageNode, Variant, Value),
-   not attr("variant_propagate", PackageNode, Variant, Value, _).
+% We must select one definition for each defined variant on a node.
+1 {
+  node_has_variant(PackageNode, Name, VariantID) : variant_definition(PackageNode, Name, VariantID)
+} 1 :-
+  variant_defined(PackageNode, Name).
 
-% Cannot receive different values from different sources on the same variant
-error(100, "{0} and {1} cannot both propagate variant '{2}' to package {3} with values '{4}' and '{5}'", Source1, Source2, Variant, Package, Value1, Value2) :-
-  attr("variant_propagate", node(X, Package), Variant, Value1, Source1),
-  attr("variant_propagate", node(X, Package), Variant, Value2, Source2),
-  node_has_variant(node(X, Package), Variant),
-  Value1 < Value2, Source1 < Source2.
+% Solver must pick the variant definition with the highest id. When conditions hold
+% for two or more variant definitions, this prefers the last one defined.
+:- node_has_variant(node(NodeID, Package), Name, SelectedVariantID),
+   variant_definition(node(NodeID, Package), Name, VariantID),
+   VariantID > SelectedVariantID,
+   internal_error("If the solver picks a variant descriptor it must use that variant descriptor").
+
+% B: Associating applicable package rules with nodes
+
+% The default value for a variant in a package is what is prescribed:
+% 1. On the command line
+% 2. In packages.yaml (if there's no command line settings)
+% 3. In the package.py file (if there are no settings in packages.yaml and the command line)
+
+% -- Associate the definition's default values with the node
+% note that the package.py variant defaults are associated with a particular definition, but
+% packages.yaml and CLI are associated with just the variant name.
+% Also, settings specified on the CLI apply to all duplicates, but always have
+% `min_dupe_id` as their node id.
+variant_default_value(node(NodeID, Package), VariantName, Value) :-
+  node_has_variant(node(NodeID, Package), VariantName, VariantID),
+  pkg_fact(Package, variant_default_value_from_package_py(VariantID, Value)),
+  not variant_default_value_from_packages_yaml(Package, VariantName, _),
+  not attr("variant_default_value_from_cli", node(min_dupe_id, Package), VariantName, _).
+
+variant_default_value(node(NodeID, Package), VariantName, Value) :-
+  node_has_variant(node(NodeID, Package), VariantName, _),
+  variant_default_value_from_packages_yaml(Package, VariantName, Value),
+  not attr("variant_default_value_from_cli", node(min_dupe_id, Package), VariantName, _).
+
+variant_default_value(node(NodeID, Package), VariantName, Value) :-
+    node_has_variant(node(NodeID, Package), VariantName, _),
+    attr("variant_default_value_from_cli", node(min_dupe_id, Package), VariantName, Value).
+
+% -- Associate the definition's possible values with the node
+variant_possible_value(node(NodeID, Package), VariantName, Value) :-
+  node_has_variant(node(NodeID, Package), VariantName, VariantID),
+  pkg_fact(Package, variant_possible_value(VariantID, Value)).
+
+variant_value_from_disjoint_sets(node(NodeID, Package), VariantName, Value1, Set1) :-
+  node_has_variant(node(NodeID, Package), VariantName, VariantID),
+  pkg_fact(Package, variant_value_from_disjoint_sets(VariantID, Value1, Set1)).
+
+% -- Associate definition's arity with the node
+variant_single_value(node(NodeID, Package), VariantName) :-
+  node_has_variant(node(NodeID, Package), VariantName, VariantID),
+  not variant_type(VariantID, "multi").
+
+% C: Determining variant values on each node
+
+% if a variant is sticky, but not set, its value is the default value
+attr("variant_selected", node(ID, Package), Variant, Value, VariantType, VariantID) :-
+  node_has_variant(node(ID, Package), Variant, VariantID),
+  variant_default_value(node(ID, Package), Variant, Value),
+  pkg_fact(Package, variant_sticky(VariantID)),
+  variant_type(VariantID, VariantType),
+  not attr("variant_set", node(ID, Package), Variant),
+  build(node(ID, Package)).
+
+% we can choose variant values from all the possible values for the node
+{
+  attr("variant_selected", node(ID, Package), Variant, Value, VariantType, VariantID)
+  : variant_possible_value(node(ID, Package), Variant, Value)
+} :-
+  attr("node", node(ID, Package)),
+  node_has_variant(node(ID, Package), Variant, VariantID),
+  variant_type(VariantID, VariantType),
+  build(node(ID, Package)).
+
+% variant_selected is only needed for reconstruction on the python side, so we can ignore it here
+attr("variant_value", PackageNode, Variant, Value) :-
+  attr("variant_selected", PackageNode, Variant, Value, VariantType, VariantID).
 
 % a variant cannot be set if it is not a variant on the package
 error(100, "Cannot set variant '{0}' for package '{1}' because the variant condition cannot be satisfied for the given spec", Variant, Package)
-  :- attr("variant_set", node(X, Package), Variant),
-     not node_has_variant(node(X, Package), Variant),
-     build(node(X, Package)).
+  :- attr("variant_set", node(ID, Package), Variant),
+     not node_has_variant(node(ID, Package), Variant, _),
+     build(node(ID, Package)).
 
 % a variant cannot take on a value if it is not a variant of the package
 error(100, "Cannot set variant '{0}' for package '{1}' because the variant condition cannot be satisfied for the given spec", Variant, Package)
-  :- attr("variant_value", node(X, Package), Variant, _),
-     not node_has_variant(node(X, Package), Variant),
-     build(node(X, Package)).
-
-% if a variant is sticky and not set its value is the default value
-attr("variant_value", node(ID, Package), Variant, Value) :-
-  node_has_variant(node(ID, Package), Variant),
-  not attr("variant_set", node(ID, Package), Variant),
-  pkg_fact(Package, variant_sticky(Variant)),
-  variant_default_value(Package, Variant, Value),
-  build(node(ID, Package)).
+  :- attr("variant_value", node(ID, Package), Variant, _),
+     not node_has_variant(node(ID, Package), Variant, _),
+     build(node(ID, Package)).
 
 % at most one variant value for single-valued variants.
-{
-  attr("variant_value", node(ID, Package), Variant, Value)
-  : pkg_fact(Package, variant_possible_value(Variant, Value))
-}
- :- attr("node", node(ID, Package)),
-    node_has_variant(node(ID, Package), Variant),
-    build(node(ID, Package)).
-
-
-error(100, "'{0}' required multiple values for single-valued variant '{1}'", Package, Variant)
+error(100, "'{0}' requires conflicting variant values 'Spec({1}={2})' and 'Spec({1}={3})'", Package, Variant, Value1, Value2)
   :- attr("node", node(ID, Package)),
-     node_has_variant(node(ID, Package), Variant),
-     pkg_fact(Package, variant_single_value(Variant)),
-     build(node(ID, Package)),
-     2 { attr("variant_value", node(ID, Package), Variant, Value) }.
+     node_has_variant(node(ID, Package), Variant, _),
+     variant_single_value(node(ID, Package), Variant),
+     attr("variant_value", node(ID, Package), Variant, Value1),
+     attr("variant_value", node(ID, Package), Variant, Value2),
+     Value1 < Value2,
+     build(node(ID, Package)).
 
 error(100, "No valid value for variant '{1}' of package '{0}'", Package, Variant)
-  :- attr("node", node(X, Package)),
-     node_has_variant(node(X, Package), Variant),
-     build(node(X, Package)),
-     not attr("variant_value", node(X, Package), Variant, _).
+  :- attr("node", node(ID, Package)),
+     node_has_variant(node(ID, Package), Variant, _),
+     build(node(ID, Package)),
+     not attr("variant_value", node(ID, Package), Variant, _).
 
 % if a variant is set to anything, it is considered 'set'.
 attr("variant_set", PackageNode, Variant) :- attr("variant_set", PackageNode, Variant, _).
@@ -839,50 +1154,47 @@ attr("variant_set", PackageNode, Variant) :- attr("variant_set", PackageNode, Va
 % have been built w/different variants from older/different package versions.
 error(10, "'Spec({1}={2})' is not a valid value for '{0}' variant '{1}'", Package, Variant, Value)
  :- attr("variant_value", node(ID, Package), Variant, Value),
-    not pkg_fact(Package, variant_possible_value(Variant, Value)),
+    not variant_possible_value(node(ID, Package), Variant, Value),
     build(node(ID, Package)).
 
-% Some multi valued variants accept multiple values from disjoint sets.
-% Ensure that we respect that constraint and we don't pick values from more
-% than one set at once
+% Some multi valued variants accept multiple values from disjoint sets. Ensure that we
+% respect that constraint and we don't pick values from more than one set at once
 error(100, "{0} variant '{1}' cannot have values '{2}' and '{3}' as they come from disjoint value sets", Package, Variant, Value1, Value2)
   :- attr("variant_value", node(ID, Package), Variant, Value1),
      attr("variant_value", node(ID, Package), Variant, Value2),
-     pkg_fact(Package, variant_value_from_disjoint_sets(Variant, Value1, Set1)),
-     pkg_fact(Package, variant_value_from_disjoint_sets(Variant, Value2, Set2)),
+     variant_value_from_disjoint_sets(node(ID, Package), Variant, Value1, Set1),
+     variant_value_from_disjoint_sets(node(ID, Package), Variant, Value2, Set2),
      Set1 < Set2, % see[1]
      build(node(ID, Package)).
 
-% variant_set is an explicitly set variant value. If it's not 'set',
-% we revert to the default value. If it is set, we force the set value
-attr("variant_value", PackageNode, Variant, Value)
- :- attr("node", PackageNode),
-    node_has_variant(PackageNode, Variant),
-    attr("variant_set", PackageNode, Variant, Value).
+:- attr("variant_set", node(ID, Package), Variant, Value),
+   not attr("variant_value", node(ID, Package), Variant, Value).
+   internal_error("If a variant is set to a value it must have that value").
 
 % The rules below allow us to prefer default values for variants
 % whenever possible. If a variant is set in a spec, or if it is
 % specified in an external, we score it as if it was a default value.
 variant_not_default(node(ID, Package), Variant, Value)
  :- attr("variant_value", node(ID, Package), Variant, Value),
-    not variant_default_value(Package, Variant, Value),
+    not variant_default_value(node(ID, Package), Variant, Value),
     % variants set explicitly on the CLI don't count as non-default
     not attr("variant_set", node(ID, Package), Variant, Value),
     % variant values forced by propagation don't count as non-default
-    not attr("variant_propagate", node(ID, Package), Variant, Value, _),
+    not propagate(node(ID, Package), variant_value(Variant, Value, _)),
     % variants set on externals that we could use don't count as non-default
     % this makes spack prefer to use an external over rebuilding with the
     % default configuration
     not external_with_variant_set(node(ID, Package), Variant, Value),
     attr("node", node(ID, Package)).
 
-
 % A default variant value that is not used
 variant_default_not_used(node(ID, Package), Variant, Value)
-  :- variant_default_value(Package, Variant, Value),
-     node_has_variant(node(ID, Package), Variant),
+  :- variant_default_value(node(ID, Package), Variant, Value),
+     node_has_variant(node(ID, Package), Variant, _),
      not attr("variant_value", node(ID, Package), Variant, Value),
-     not attr("variant_propagate", node(ID, Package), Variant, _, _),
+     not propagate(node(ID, Package), variant_value(Variant, _, _)),
+     % variant set explicitly don't count for this metric
+     not attr("variant_set", node(ID, Package), Variant, _),
      attr("node", node(ID, Package)).
 
 % The variant is set in an external spec
@@ -894,25 +1206,6 @@ external_with_variant_set(node(NodeID, Package), Variant, Value)
     external(node(NodeID, Package)),
     attr("node", node(NodeID, Package)).
 
-% The default value for a variant in a package is what is prescribed:
-%
-% 1. On the command line
-% 2. In packages.yaml (if there's no command line settings)
-% 3. In the package.py file (if there are no settings in
-%    packages.yaml and the command line)
-%
-variant_default_value(Package, Variant, Value)
- :- pkg_fact(Package, variant_default_value_from_package_py(Variant, Value)),
-    not variant_default_value_from_packages_yaml(Package, Variant, _),
-    not attr("variant_default_value_from_cli", node(min_dupe_id, Package), Variant, _).
-
-variant_default_value(Package, Variant, Value)
- :- variant_default_value_from_packages_yaml(Package, Variant, Value),
-    not attr("variant_default_value_from_cli", node(min_dupe_id, Package), Variant, _).
-
-variant_default_value(Package, Variant, Value) :-
-    attr("variant_default_value_from_cli", node(min_dupe_id, Package), Variant, Value).
-
 % Treat 'none' in a special way - it cannot be combined with other
 % values even if the variant is multi-valued
 error(100, "{0} variant '{1}' cannot have values '{2}' and 'none'", Package, Variant, Value)
@@ -921,36 +1214,195 @@ error(100, "{0} variant '{1}' cannot have values '{2}' and 'none'", Package, Var
     Value != "none",
     build(node(X, Package)).
 
-% patches and dev_path are special variants -- they don't have to be
-% declared in the package, so we just allow them to spring into existence
-% when assigned a value.
-auto_variant("dev_path").
-auto_variant("patches").
+% -- Auto variants
+% These don't have to be declared in the package. We allow them to spring into
+% existence when assigned a value.
+variant_possible_value(PackageNode, Variant, Value)
+  :- attr("variant_set", PackageNode, Variant, Value), auto_variant(Variant, _).
 
-node_has_variant(PackageNode, Variant)
-  :- attr("variant_set", PackageNode, Variant, _), auto_variant(Variant).
+node_has_variant(PackageNode, Variant, VariantID)
+  :- attr("variant_set", PackageNode, Variant, _), auto_variant(Variant, VariantID).
 
-pkg_fact(Package, variant_single_value("dev_path"))
-  :- attr("variant_set", node(ID, Package), "dev_path", _).
+variant_single_value(PackageNode, Variant)
+  :- node_has_variant(PackageNode, Variant, VariantID),
+     auto_variant(Variant, VariantID),
+     not variant_type(VariantID, "multi").
 
 % suppress warnings about this atom being unset.  It's only set if some
 % spec or some package sets it, and without this, clingo will give
 % warnings like 'info: atom does not occur in any rule head'.
 #defined variant_default_value/3.
 #defined variant_default_value_from_packages_yaml/3.
+#defined variant_default_value_from_package_py/3.
+
+%-----------------------------------------------------------------------------
+% Propagation semantics
+%-----------------------------------------------------------------------------
+
+non_default_propagation(variant_value(Name, Value)) :- attr("propagate", RootNode, variant_value(Name, Value)).
+
+% Propagation roots have a corresponding attr("propagate", ...)
+propagate(RootNode, PropagatedAttribute) :- attr("propagate", RootNode, PropagatedAttribute), not non_default_propagation(PropagatedAttribute).
+propagate(RootNode, PropagatedAttribute, EdgeTypes) :- attr("propagate", RootNode, PropagatedAttribute, EdgeTypes).
+
+% Special case variants, to inject the source node in the propagated attribute
+propagate(RootNode, variant_value(Name, Value, RootNode)) :- attr("propagate", RootNode, variant_value(Name, Value)).
+
+% Propagate an attribute along edges to child nodes
+propagate(ChildNode, PropagatedAttribute) :-
+  propagate(ParentNode, PropagatedAttribute),
+  depends_on(ParentNode, ChildNode).
+
+propagate(ChildNode, PropagatedAttribute, edge_types(DepType1, DepType2)) :-
+  propagate(ParentNode, PropagatedAttribute, edge_types(DepType1, DepType2)),
+  depends_on(ParentNode, ChildNode),
+  1 { attr("depends_on", ParentNode, ChildNode, DepType1);  attr("depends_on", ParentNode, ChildNode, DepType2) }.
+
+%-----------------------------------------------------------------------------
+% Activation of propagated values
+%-----------------------------------------------------------------------------
+
+%----
+% Variants
+%----
+
+% If a variant is propagated, and can be accepted, set its value
+attr("variant_selected", PackageNode, Variant, Value, VariantType, VariantID) :-
+  propagate(PackageNode, variant_value(Variant, Value, _)),
+  node_has_variant(PackageNode, Variant, VariantID),
+  variant_type(VariantID, VariantType),
+  variant_possible_value(PackageNode, Variant, Value).
+
+% If a variant is propagated, we cannot have extraneous values
+variant_is_propagated(PackageNode, Variant) :-
+  attr("variant_value", PackageNode, Variant, Value),
+  propagate(PackageNode, variant_value(Variant, Value, _)),
+  not attr("variant_set", PackageNode, Variant).
+
+:- variant_is_propagated(PackageNode, Variant),
+   attr("variant_selected", PackageNode, Variant, Value, _, _),
+   not propagate(PackageNode, variant_value(Variant, Value, _)).
+
+error(100, "{0} and {1} cannot both propagate variant '{2}' to the shared dependency: {3}",
+  Package1, Package2, Variant, Dependency) :-
+  % The variant is a singlevalued variant
+  variant_single_value(node(X, Package1), Variant),
+  % Dependency is trying to propagate Variant with different values and is not the source package
+  propagate(node(Z, Dependency), variant_value(Variant, Value1, node(X, Package1))),
+  propagate(node(Z, Dependency), variant_value(Variant, Value2, node(Y, Package2))),
+  % Package1 and Package2 and their values are different
+  Package1 > Package2,  Value1 != Value2,
+  not propagate(node(Z, Dependency), variant_value(Variant, _, node(Z, Dependency))).
+
+% Cannot propagate the same variant from two different packages if one is a dependency of the other
+error(100, "{0} and {1} cannot both propagate variant '{2}'", Package1, Package2, Variant) :-
+  % The variant is a single-valued variant
+  variant_single_value(node(X, Package1), Variant),
+  % Package1 and Package2 and their values are different
+  Package1 != Package2,  Value1 != Value2,
+  % Package2 is set to propagate the value from Package1
+  propagate(node(Y, Package2), variant_value(Variant, Value2, node(X, Package2))),
+  propagate(node(Y, Package2), variant_value(Variant, Value1, node(X, Package1))),
+  variant_is_propagated(node(Y, Package2), Variant).
+
+% Cannot propagate a variant if a different value was set for it in a dependency
+error(100, "Cannot propagate the variant '{0}' from the package: {1} because package: {2} is set to exclude it", Variant, Source, Package) :-
+  % Package has a Variant and Source is propagating Variant
+  attr("variant_set", node(X, Package), Variant, Value1),
+  % The packages and values are different
+  Source != Package,  Value1 != Value2,
+  % The variant is a single-valued variant
+  variant_single_value(node(X, Package1), Variant),
+  % A different value is being propagated from somewhere else
+  propagate(node(X, Package), variant_value(Variant, Value2, node(Y, Source))).
+
+%----
+% Flags
+%----
+
+% A propagated flag implies:
+% 1. The same flag type is not set on this node
+% 2. This node has the same compilers as the propagation source
+
+node_compiler(node(X, Package), node(Y, Compiler)) :- node_compiler(node(X, Package), node(Y, Compiler), Language).
+
+node_compiler(node(X, Package), node(Y, Compiler), Language) :-
+     attr("virtual_on_edge", node(X, Package), node(Y, Compiler), Language),
+     compiler(Compiler), language(Language).
+
+propagated_flag(node(PackageID, Package), node_flag(FlagType, Flag, FlagGroup, Source), SourceNode) :-
+  propagate(node(PackageID, Package), node_flag(FlagType, Flag, FlagGroup, Source), _),
+  not attr("node_flag_set", node(PackageID, Package), node_flag(FlagType, _, _, "literal")),
+  % Same compilers as propagation source
+  node_compiler(node(PackageID, Package), CompilerNode, Language) : node_compiler(SourceNode, CompilerNode, Language);
+  attr("propagate", SourceNode, node_flag(FlagType, Flag, FlagGroup, Source), _),
+  node(PackageID, Package) != SourceNode,
+  not runtime(Package).
+
+attr("node_flag", PackageNode, NodeFlag) :- propagated_flag(PackageNode, NodeFlag, _).
+
+% Cannot propagate the same flag from two distinct sources
+error(100, "{0} and {1} cannot both propagate compiler flags '{2}' to {3}", Source1, Source2, FlagType, Package) :-
+  propagated_flag(node(ID, Package), node_flag(FlagType, _, _, _), node(_, Source1)),
+  propagated_flag(node(ID, Package), node_flag(FlagType, _, _, _), node(_, Source2)),
+  Source1 < Source2.
+
+%----
+% Compiler constraints
+%----
+
+% If a node is built, impose constraints on the compiler coming from dependents
+attr("node_version_satisfies", node(Y, Compiler), VersionRange) :-
+   propagate(node(X, Package), node_version_satisfies(Compiler, VersionRange)),
+   attr("depends_on", node(X, Package), node(Y, Compiler), "build"),
+   not external(node(X, Package)),
+   not runtime(Package).
+
+attr("node_version_satisfies", node(X, Runtime), VersionRange) :-
+   attr("node", node(X, Runtime)),
+   attr("compatible_runtime", PackageNode, Runtime, VersionRange),
+   concrete(PackageNode).
+
+% If a compiler package is depended on with type link, it's used as a library
+compiler_used_as_a_library(node(X, Child), Hash) :-
+  concrete(node(X, Child)),
+  attr("hash", node(X, Child), Hash),
+  compiler_package(Child), % Used to restrict grounding for this rule
+  attr("depends_on", _, node(X, Child), "link").
+
+% If a compiler is used for C on a package, it must provide C++ too, if need be, and vice-versa
+:-  attr("virtual_on_edge", PackageNode, CompilerNode1, "c"),
+    attr("virtual_on_edge", PackageNode, CompilerNode2, "cxx"),
+    CompilerNode1 != CompilerNode2.
+
+
+%-----------------------------------------------------------------------------
+% Runtimes
+%-----------------------------------------------------------------------------
+
+% Check whether the DAG has any built package
+has_built_packages() :- build(X), not external(X).
+
+% "gcc-runtime" is always built
+:- concrete(node(X, "gcc-runtime")), has_built_packages().
+
+% The "gcc" linked to "gcc-runtime" must be used by at least another package
+:- attr("depends_on", node(X, "gcc-runtime"), node(Y, "gcc"), "build"),
+   node_compiler(_, node(_, "gcc")),
+   not 2 { attr("depends_on", PackageNode, node(Y, "gcc"), "build") : attr("node", PackageNode) }.
+
 
 %-----------------------------------------------------------------------------
 % Platform semantics
 %-----------------------------------------------------------------------------
 
-% if no platform is set, fall back to the default
-error(100, "platform '{0}' is not allowed on the current host", Platform)
-  :- attr("node_platform", _, Platform), not allowed_platform(Platform).
+% NOTE: Currently we have a single allowed platform per DAG, therefore there is no
+% need to have additional optimization criteria. If we ever add cross-platform dags,
+% this needs to be changed.
+:- 2 { allowed_platform(Platform) }, internal_error("More than one allowed platform detected").
 
-attr("node_platform", PackageNode, Platform)
- :- attr("node", PackageNode),
-    not attr("node_platform_set", PackageNode),
-    node_platform_default(Platform).
+1 { attr("node_platform", PackageNode, Platform) : allowed_platform(Platform) } 1
+  :- attr("node", PackageNode).
 
 % setting platform on a node is a hard constraint
 attr("node_platform", PackageNode, Platform)
@@ -974,42 +1426,17 @@ error(100, "Cannot select '{0} os={1}' (operating system '{1}' is not buildable)
     attr("node_os", node(X, Package), OS),
     not buildable_os(OS).
 
-% can't have dependencies on incompatible OS's
-error(100, "{0} and dependency {1} have incompatible operating systems 'os={2}' and 'os={3}'", Package, Dependency, PackageNodeOS, DependencyOS)
-  :- depends_on(node(X, Package), node(Y, Dependency)),
-     attr("node_os", node(X, Package), PackageNodeOS),
-     attr("node_os", node(Y, Dependency), DependencyOS),
-     not os_compatible(PackageNodeOS, DependencyOS),
-     build(node(X, Package)).
-
 % give OS choice weights according to os declarations
 node_os_weight(PackageNode, Weight)
  :- attr("node", PackageNode),
     attr("node_os", PackageNode, OS),
     os(OS, Weight).
 
-% match semantics for OS's
-node_os_match(PackageNode, DependencyNode) :-
-   depends_on(PackageNode, DependencyNode),
-   attr("node_os", PackageNode, OS),
-   attr("node_os", DependencyNode, OS).
-
-node_os_mismatch(PackageNode, DependencyNode) :-
-   depends_on(PackageNode, DependencyNode),
-   not node_os_match(PackageNode, DependencyNode).
-
 % every OS is compatible with itself. We can use `os_compatible` to declare
 os_compatible(OS, OS) :- os(OS).
 
 % Transitive compatibility among operating systems
 os_compatible(OS1, OS3) :- os_compatible(OS1, OS2), os_compatible(OS2, OS3).
-
-% We can select only operating systems compatible with the ones
-% for which we can build software. We need a cardinality constraint
-% since we might have more than one "buildable_os(OS)" fact.
-:- not 1 { os_compatible(CurrentOS, ReusedOS) : buildable_os(CurrentOS) },
-   attr("node_os", Package, ReusedOS),
-   internal_error("Reused OS incompatible with build OS").
 
 % If an OS is set explicitly respect the value
 attr("node_os", PackageNode, OS) :- attr("node_os_set", PackageNode, OS), attr("node", PackageNode).
@@ -1036,7 +1463,7 @@ attr("node_target_satisfies", PackageNode, Constraint)
 
 % If a node has a target, all of its dependencies must be compatible with that target
 error(100, "Cannot find compatible targets for {0} and {1}", Package, Dependency)
-  :- depends_on(node(X, Package), node(Y, Dependency)),
+  :- attr("depends_on", node(X, Package), node(Y, Dependency), Type), Type != "build",
      attr("node_target", node(X, Package), Target),
      not node_target_compatible(node(Y, Dependency), Target).
 
@@ -1048,25 +1475,40 @@ node_target_compatible(PackageNode, Target)
     target_compatible(Target, MyTarget).
 
 #defined target_satisfies/2.
+compiler(Compiler) :- compiler_supports_target(Compiler, _, _).
 
-% can't use targets on node if the compiler for the node doesn't support them
-error(100, "{0} compiler '{2}@{3}' incompatible with 'target={1}'", Package, Target, Compiler, Version)
+% Can't use targets on node if the compiler for the node doesn't support them
+language("c").
+language("cxx").
+language("fortran").
+language_runtime("fortran-rt").
+
+error(10, "Only external, or concrete, compilers are allowed for the {0} language", Language)
+  :- provider(ProviderNode, node(_, Language)),
+     language(Language),
+     not external(ProviderNode),
+     not concrete(ProviderNode).
+
+error(10, "{0} compiler '{2}@{3}' incompatible with 'target={1}'", Package, Target, Compiler, Version)
   :- attr("node_target", node(X, Package), Target),
-     node_compiler(node(X, Package), CompilerID),
-     not compiler_supports_target(CompilerID, Target),
-     compiler_name(CompilerID, Compiler),
-     compiler_version(CompilerID, Version),
+     node_compiler(node(X, Package), node(Y, Compiler)),
+     attr("version", node(Y, Compiler), Version),
+     not compiler_supports_target(Compiler, Version, Target),
      build(node(X, Package)).
+
+#defined compiler_supports_target/2.
 
 % if a target is set explicitly, respect it
 attr("node_target", PackageNode, Target)
  :- attr("node", PackageNode), attr("node_target_set", PackageNode, Target).
 
-% each node has the weight of its assigned target
-node_target_weight(node(ID, Package), Weight)
- :- attr("node", node(ID, Package)),
-    attr("node_target", node(ID, Package), Target),
-    target_weight(Target, Weight).
+node_target_weight(PackageNode, MinWeight)
+ :- attr("node", PackageNode),
+    attr("node_target", PackageNode, Target),
+    target(Target),
+    MinWeight = #min { Weight : target_weight(Target, Weight) }.
+
+:- attr("node_target", PackageNode, Target), not node_target_weight(PackageNode, _).
 
 % compatibility rules for targets among nodes
 node_target_match(ParentNode, DependencyNode)
@@ -1085,224 +1527,98 @@ error(100, "'{0} target={1}' is not compatible with this machine", Package, Targ
      not target(Target).
 
 %-----------------------------------------------------------------------------
-% Compiler semantics
-%-----------------------------------------------------------------------------
-% There must be only one compiler set per built node.
-{ node_compiler(PackageNode, CompilerID) : compiler_id(CompilerID) } :-
-    attr("node", PackageNode),
-    build(PackageNode).
-
-% Infer the compiler that matches a reused node
-node_compiler(PackageNode, CompilerID)
-  :- attr("node_compiler_version", PackageNode, CompilerName, CompilerVersion),
-     attr("node", PackageNode),
-     compiler_name(CompilerID, CompilerName),
-     compiler_version(CompilerID, CompilerVersion),
-     concrete(PackageNode).
-
-% Expand the internal attribute into "attr("node_compiler_version")
-attr("node_compiler_version", PackageNode, CompilerName, CompilerVersion)
-  :- node_compiler(PackageNode, CompilerID),
-     compiler_name(CompilerID, CompilerName),
-     compiler_version(CompilerID, CompilerVersion),
-     build(PackageNode).
-
-attr("node_compiler", PackageNode, CompilerName)
-  :- attr("node_compiler_version", PackageNode, CompilerName, CompilerVersion).
-
-error(100, "No valid compiler version found for '{0}'", Package)
-  :- attr("node", node(X, Package)),
-     not node_compiler(node(X, Package), _).
-
-% We can't have a compiler be enforced and select the version from another compiler
-error(100, "Cannot select a single compiler for package {0}", Package)
- :- attr("node", node(X, Package)),
-    2 { attr("node_compiler_version", node(X, Package), C, V) }.
-
-% If the compiler of a node cannot be satisfied, raise
-error(10, "No valid compiler for {0} satisfies '%{1}'", Package, Compiler)
-  :- attr("node", node(X, Package)),
-     attr("node_compiler_version_satisfies", node(X, Package), Compiler, ":"),
-     not compiler_version_satisfies(Compiler, ":", _).
-
-% If the compiler of a node must satisfy a constraint, then its version
-% must be chosen among the ones that satisfy said constraint
-error(100, "No valid version for '{0}' compiler '{1}' satisfies '@{2}'", Package, Compiler, Constraint)
-  :- attr("node", node(X, Package)),
-     attr("node_compiler_version_satisfies", node(X, Package), Compiler, Constraint),
-		 not compiler_version_satisfies(Compiler, Constraint, _).
-
-error(100, "No valid version for '{0}' compiler '{1}' satisfies '@{2}'", Package, Compiler, Constraint)
-  :- attr("node", node(X, Package)),
-     attr("node_compiler_version_satisfies", node(X, Package), Compiler, Constraint),
-     not compiler_version_satisfies(Compiler, Constraint, ID),
-     node_compiler(node(X, Package), ID).
-
-% If the node is associated with a compiler and the compiler satisfy a constraint, then
-% the compiler associated with the node satisfy the same constraint
-attr("node_compiler_version_satisfies", PackageNode, Compiler, Constraint)
-  :- node_compiler(PackageNode, CompilerID),
-     compiler_name(CompilerID, Compiler),
-     compiler_version_satisfies(Compiler, Constraint, CompilerID).
-
-#defined compiler_version_satisfies/3.
-
-% If the compiler version was set from the command line,
-% respect it verbatim
-:- attr("node_compiler_version_set", PackageNode, Compiler, Version),
-   not attr("node_compiler_version", PackageNode, Compiler, Version).
-
-:- attr("node_compiler_set", PackageNode, Compiler),
-   not attr("node_compiler_version", PackageNode, Compiler, _).
-
-% Cannot select a compiler if it is not supported on the OS
-% Compilers that are explicitly marked as allowed
-% are excluded from this check
-error(100, "{0} compiler '%{1}@{2}' incompatible with 'os={3}'", Package, Compiler, Version, OS)
-  :- attr("node_os", node(X, Package), OS),
-     node_compiler(node(X, Package), CompilerID),
-     compiler_name(CompilerID, Compiler),
-     compiler_version(CompilerID, Version),
-     not compiler_os(CompilerID, OS),
-     not allow_compiler(Compiler, Version),
-     build(node(X, Package)).
-
-% If a package and one of its dependencies don't have the
-% same compiler there's a mismatch.
-compiler_match(PackageNode, DependencyNode)
-  :- depends_on(PackageNode, DependencyNode),
-     node_compiler(PackageNode, CompilerID),
-     node_compiler(DependencyNode, CompilerID).
-
-compiler_mismatch(PackageNode, DependencyNode)
-  :- depends_on(PackageNode, DependencyNode),
-     not attr("node_compiler_set", DependencyNode, _),
-     not compiler_match(PackageNode, DependencyNode).
-
-compiler_mismatch_required(PackageNode, DependencyNode)
-  :- depends_on(PackageNode, DependencyNode),
-     attr("node_compiler_set", DependencyNode, _),
-     not compiler_match(PackageNode, DependencyNode).
-
-#defined compiler_os/3.
-#defined allow_compiler/2.
-
-% compilers weighted by preference according to packages.yaml
-node_compiler_weight(node(ID, Package), Weight)
- :- node_compiler(node(ID, Package), CompilerID),
-    compiler_name(CompilerID, Compiler),
-    compiler_version(CompilerID, V),
-    compiler_weight(CompilerID, Weight).
-
-node_compiler_weight(node(ID, Package), 100)
- :- node_compiler(node(ID, Package), CompilerID),
-    compiler_name(CompilerID, Compiler),
-    compiler_version(CompilerID, V),
-    not compiler_weight(CompilerID, _).
-
-% For the time being, be strict and reuse only if the compiler match one we have on the system
-error(100, "Compiler {1}@{2} requested for {0} cannot be found. Set install_missing_compilers:true if intended.", Package, Compiler, Version)
- :- attr("node_compiler_version", node(ID, Package), Compiler, Version),
-    not node_compiler(node(ID, Package), _).
-
-#defined node_compiler_preference/4.
-#defined compiler_weight/3.
-
-%-----------------------------------------------------------------------------
 % Compiler flags
 %-----------------------------------------------------------------------------
 
-% propagate flags when compiler match
-can_inherit_flags(PackageNode, DependencyNode, FlagType)
-  :- same_compiler(PackageNode, DependencyNode),
-     not attr("node_flag_set", DependencyNode, FlagType, _),
-     flag_type(FlagType).
-
-same_compiler(PackageNode, DependencyNode)
-  :- depends_on(PackageNode, DependencyNode),
-     node_compiler(PackageNode, CompilerID),
-     node_compiler(DependencyNode, CompilerID),
-     compiler_id(CompilerID).
-
-node_flag_inherited(DependencyNode, FlagType, Flag)
-  :- attr("node_flag_set", PackageNode, FlagType, Flag),
-     can_inherit_flags(PackageNode, DependencyNode, FlagType),
-     attr("node_flag_propagate", PackageNode, FlagType).
-
-% Ensure propagation
-:- node_flag_inherited(PackageNode, FlagType, Flag),
-   can_inherit_flags(PackageNode, DependencyNode, FlagType),
-   attr("node_flag_propagate", PackageNode, FlagType).
-
-error(100, "{0} and {1} cannot both propagate compiler flags '{2}' to {3}", Source1, Source2, Package, FlagType) :-
-  depends_on(Source1, Package),
-  depends_on(Source2, Package),
-  attr("node_flag_propagate", Source1, FlagType),
-  attr("node_flag_propagate", Source2, FlagType),
-  can_inherit_flags(Source1, Package, FlagType),
-  can_inherit_flags(Source2, Package, FlagType),
-  Source1 < Source2.
-
-% remember where flags came from
-attr("node_flag_source", PackageNode, FlagType, PackageNode)
-  :- attr("node_flag_set", PackageNode, FlagType, _).
-
-attr("node_flag_source", DependencyNode, FlagType, Q)
-  :- attr("node_flag_source", PackageNode, FlagType, Q),
-     node_flag_inherited(DependencyNode, FlagType, _),
-     attr("node_flag_propagate", PackageNode, FlagType).
-
-% compiler flags from compilers.yaml are put on nodes if compiler matches
-attr("node_flag", PackageNode, FlagType, Flag)
-  :- compiler_flag(CompilerID, FlagType, Flag),
-     node_compiler(PackageNode, CompilerID),
-     flag_type(FlagType),
-     compiler_id(CompilerID),
-     compiler_name(CompilerID, CompilerName),
-     compiler_version(CompilerID, Version).
-
-attr("node_flag_compiler_default", PackageNode)
-  :- not attr("node_flag_set", PackageNode, FlagType, _),
-     compiler_flag(CompilerID, FlagType, Flag),
-     node_compiler(PackageNode, CompilerID),
-     flag_type(FlagType),
-     compiler_id(CompilerID),
-     compiler_name(CompilerID, CompilerName),
-     compiler_version(CompilerID, Version).
-
-% if a flag is set to something or inherited, it's included
-attr("node_flag", PackageNode, FlagType, Flag) :- attr("node_flag_set", PackageNode, FlagType, Flag).
-attr("node_flag", PackageNode, FlagType, Flag) :- node_flag_inherited(PackageNode, FlagType, Flag).
-
-% if no node flags are set for a type, there are no flags.
-attr("no_flags", PackageNode, FlagType)
-  :- not attr("node_flag", PackageNode, FlagType, _),
-     attr("node", PackageNode),
-     flag_type(FlagType).
-
-#defined compiler_flag/3.
-
+attr("node_flag", PackageNode, NodeFlag) :- attr("node_flag_set", PackageNode, NodeFlag).
 
 %-----------------------------------------------------------------------------
-% Installed packages
+% Installed Packages
 %-----------------------------------------------------------------------------
-% the solver is free to choose at most one installed hash for each package
-{ attr("hash", node(ID, Package), Hash) : installed_hash(Package, Hash) } 1
- :- attr("node", node(ID, Package)), internal_error("Package must resolve to at most one hash").
 
+#defined installed_hash/2.
+#defined abi_splice_conditions_hold/4.
+
+% These are the previously concretized attributes of the installed package as
+% a hash. It has the general form:
+% hash_attr(Hash, Attribute, PackageName, Args*)
+#defined hash_attr/3.
+#defined hash_attr/4.
+#defined hash_attr/5.
+#defined hash_attr/6.
+#defined hash_attr/7.
+
+{ attr("hash", node(ID, PackageName), Hash): installed_hash(PackageName, Hash) } 1 :-
+  attr("node", node(ID, PackageName)),
+  internal_error("Package must resolve to at most 1 hash").
 % you can't choose an installed hash for a dev spec
 :- attr("hash", PackageNode, Hash), attr("variant_value", PackageNode, "dev_path", _).
-
 % You can't install a hash, if it is not installed
 :- attr("hash", node(ID, Package), Hash), not installed_hash(Package, Hash).
-% This should be redundant given the constraint above
-:- attr("node", PackageNode), 2 { attr("hash", PackageNode, Hash) }.
 
-% if a hash is selected, we impose all the constraints that implies
-impose(Hash, PackageNode) :- attr("hash", PackageNode, Hash).
+% hash_attrs are versions, but can_splice_attr are usually node_version_satisfies
+hash_attr(Hash, "node_version_satisfies", PackageName, Constraint) :-
+  hash_attr(Hash, "version", PackageName, Version),
+  pkg_fact(PackageName, version_satisfies(Constraint, Version)).
 
-% if we haven't selected a hash for a package, we'll be building it
-build(PackageNode) :- not attr("hash", PackageNode, _), attr("node", PackageNode).
+% This recovers the exact semantics for hash reuse hash and depends_on are where
+% splices are decided, and virtual_on_edge can result in name-changes, which is
+% why they are all treated separately.
+
+imposed_constraint(Hash, Attr, PackageName) :- hash_attr(Hash, Attr, PackageName), Attr != "virtual_node".
+
+imposed_constraint(Hash, Attr, PackageName, A1) :- hash_attr(Hash, Attr, PackageName, A1), Attr != "hash".
+
+imposed_constraint(Hash, Attr, PackageName, A1, A2) :-
+  hash_attr(Hash, Attr, PackageName, A1, A2),
+  Attr != "depends_on",
+  Attr != "virtual_on_edge".
+
+imposed_constraint(Hash, Attr, PackageName, A1, A2, A3) :- hash_attr(Hash, Attr, PackageName, A1, A2, A3).
+imposed_constraint(Hash, "hash", PackageName, Hash) :- installed_hash(PackageName, Hash).
+
+% If a compiler is not used as a library, we just enforce "run" dependency, so we
+% can get by with a much smaller search space.
+avoid_link_dependency(Hash, DepName) :-
+  hash_attr(Hash, "depends_on", PackageName, DepName, "link"),
+  not hash_attr(Hash, "depends_on", PackageName, DepName, "run"),
+  hash_attr(Hash, "hash", DepName, DepHash),
+  compiler_package(PackageName),
+  not compiler_used_as_a_library(node(_, PackageName), Hash).
+
+% Without splicing, we simply recover the exact semantics
+imposed_constraint(ParentHash, "hash", ChildName, ChildHash) :-
+  hash_attr(ParentHash, "hash", ChildName, ChildHash),
+  ChildHash != ParentHash,
+  not avoid_link_dependency(ParentHash, ChildName),
+  not abi_splice_conditions_hold(_, _, ChildName, ChildHash).
+
+imposed_constraint(Hash, "depends_on", PackageName, DepName, Type) :-
+  hash_attr(Hash, "depends_on", PackageName, DepName, Type),
+  hash_attr(Hash, "hash", DepName, DepHash),
+  not avoid_link_dependency(Hash, DepName),
+  not attr("splice_at_hash", _, _, DepName, DepHash).
+
+imposed_constraint(Hash, "virtual_on_edge", PackageName, DepName, VirtName) :-
+  hash_attr(Hash, "virtual_on_edge", PackageName, DepName, VirtName),
+  not avoid_link_dependency(Hash, DepName),
+  not attr("splice_at_hash", _, _, DepName,_).
+
+imposed_constraint(Hash, "virtual_node", VirtName) :-
+  hash_attr(Hash, "virtual_on_edge", PackageName, DepName, VirtName),
+  hash_attr(Hash, "virtual_node", VirtName),
+  not avoid_link_dependency(Hash, DepName),
+  not attr("splice_at_hash", _, _, DepName,_).
+
+
+% Rules pertaining to attr("splice_at_hash") and abi_splice_conditions_hold will
+% be conditionally loaded from splices.lp
+
+impose(Hash, PackageNode) :- attr("hash", PackageNode, Hash), attr("node", PackageNode).
+
+% If there is not a hash for a package, we build it.
+build(PackageNode) :- attr("node", PackageNode), not concrete(PackageNode).
+
 
 % Minimizing builds is tricky. We want a minimizing criterion
 
@@ -1315,9 +1631,12 @@ build(PackageNode) :- not attr("hash", PackageNode, _), attr("node", PackageNode
 % criteria for built specs -- so that they take precedence over the otherwise
 % topmost-priority criterion to reuse what is installed.
 %
+
 % The priority ranges are:
-%   200+        Shifted priorities for build nodes; correspond to priorities 0 - 99.
-%   100 - 199   Unshifted priorities. Currently only includes minimizing #builds.
+%   1000+       Optimizations for concretization errors
+%   300 - 1000  Highest priority optimizations for valid solutions
+%   200 - 299   Shifted priorities for build nodes; correspond to priorities 0 - 99.
+%   100 - 199   Unshifted priorities. Currently only includes minimizing #builds and minimizing dupes.
 %   0   -  99   Priorities for non-built nodes.
 build_priority(PackageNode, 200) :- build(PackageNode), attr("node", PackageNode).
 build_priority(PackageNode, 0)   :- not build(PackageNode), attr("node", PackageNode).
@@ -1338,11 +1657,9 @@ build_priority(PackageNode, 0)   :- not build(PackageNode), attr("node", Package
    pkg_fact(Package, version_declared(Version, Weight, "installed")),
    not optimize_for_reuse().
 
-#defined installed_hash/2.
 
 % This statement, which is a hidden feature of clingo, let us avoid cycles in the DAG
 #edge (A, B) : depends_on(A, B).
-
 
 %-----------------------------------------------------------------
 % Optimization to avoid errors
@@ -1365,28 +1682,26 @@ build_priority(PackageNode, 0)   :- not build(PackageNode), attr("node", Package
 %   2. a `#minimize{ 0@2 : #true }.` statement that ensures the criterion
 %      is displayed (clingo doesn't display sums over empty sets by default)
 
+% A condition group specifies one or more specs that must be satisfied.
+% Specs declared first are preferred, so we assign increasing weights and
+% minimize the weights.
+opt_criterion(310, "requirement weight").
+#minimize{ 0@310: #true }.
+#minimize {
+    Weight@310,PackageNode,Group
+    : requirement_weight(PackageNode, Group, Weight)
+}.
+
 % Try hard to reuse installed packages (i.e., minimize the number built)
 opt_criterion(110, "number of packages to build (vs. reuse)").
 #minimize { 0@110: #true }.
-#minimize { 1@110,PackageNode : build(PackageNode), optimize_for_reuse() }.
+#minimize { 1@110,PackageNode : build(PackageNode) }.
 
 opt_criterion(100, "number of nodes from the same package").
 #minimize { 0@100: #true }.
 #minimize { ID@100,Package : attr("node", node(ID, Package)) }.
 #minimize { ID@100,Package : attr("virtual_node", node(ID, Package)) }.
 #defined optimize_for_reuse/0.
-
-% A condition group specifies one or more specs that must be satisfied.
-% Specs declared first are preferred, so we assign increasing weights and
-% minimize the weights.
-opt_criterion(75, "requirement weight").
-#minimize{ 0@275: #true }.
-#minimize{ 0@75: #true }.
-#minimize {
-    Weight@75+Priority,PackageNode,Group
-    : requirement_weight(PackageNode, Group, Weight),
-      build_priority(PackageNode, Priority)
-}.
 
 % Minimize the number of deprecated versions being used
 opt_criterion(73, "deprecated versions used").
@@ -1395,6 +1710,7 @@ opt_criterion(73, "deprecated versions used").
 #minimize{
     1@73+Priority,PackageNode
     : attr("deprecated", PackageNode, _),
+      not external(PackageNode),
       build_priority(PackageNode, Priority)
 }.
 
@@ -1402,11 +1718,11 @@ opt_criterion(73, "deprecated versions used").
 % 1. Version weight
 % 2. Number of variants with a non default value, if not set
 % for the root package.
-opt_criterion(70, "version weight").
+opt_criterion(70, "version badness (roots)").
 #minimize{ 0@270: #true }.
 #minimize{ 0@70: #true }.
 #minimize {
-    Weight@70+Priority
+    Weight@70+Priority,PackageNode
     : attr("root", PackageNode),
       version_weight(PackageNode, Weight),
       build_priority(PackageNode, Priority)
@@ -1426,9 +1742,9 @@ opt_criterion(60, "preferred providers for roots").
 #minimize{ 0@260: #true }.
 #minimize{ 0@60: #true }.
 #minimize{
-    Weight@60+Priority,ProviderNode,Virtual
-    : provider_weight(ProviderNode, Virtual, Weight),
-      attr("root", ProviderNode),
+    Weight@60+Priority,ProviderNode,X,Virtual
+    : provider_weight(ProviderNode, node(X, Virtual), Weight),
+      attr("root", ProviderNode), not language(Virtual), not language_runtime(Virtual),
       build_priority(ProviderNode, Priority)
 }.
 
@@ -1455,43 +1771,49 @@ opt_criterion(50, "number of non-default variants (non-roots)").
 
 % Minimize the weights of the providers, i.e. use as much as
 % possible the most preferred providers
-opt_criterion(45, "preferred providers (non-roots)").
+opt_criterion(48, "preferred providers (non-roots)").
+#minimize{ 0@248: #true }.
+#minimize{ 0@48: #true }.
+#minimize{
+    Weight@48+Priority,ProviderNode,X,Virtual
+    : provider_weight(ProviderNode, node(X, Virtual), Weight),
+      not attr("root", ProviderNode), not language(Virtual), not language_runtime(Virtual),
+      build_priority(ProviderNode, Priority)
+}.
+
+% Minimize the number of compilers used on nodes
+
+compiler_penalty(PackageNode, C-1) :-
+   C = #count { CompilerNode : node_compiler(PackageNode, CompilerNode) },
+   node_compiler(PackageNode, _).
+
+opt_criterion(46, "number of compilers used on the same node").
+#minimize{ 0@246: #true }.
+#minimize{ 0@46: #true }.
+#minimize{
+    Penalty@46+Priority,PackageNode
+    : compiler_penalty(PackageNode, Penalty), build_priority(PackageNode, Priority)
+}.
+
+% Minimize the ids of the providers, i.e. use as much as
+% possible the first providers
+opt_criterion(45, "number of duplicate virtuals needed").
 #minimize{ 0@245: #true }.
 #minimize{ 0@45: #true }.
 #minimize{
     Weight@45+Priority,ProviderNode,Virtual
-    : provider_weight(ProviderNode, Virtual, Weight),
-      not attr("root", ProviderNode),
+    : provider(ProviderNode, node(Weight, Virtual)),
       build_priority(ProviderNode, Priority)
 }.
 
-% Try to minimize the number of compiler mismatches in the DAG.
-opt_criterion(40, "compiler mismatches that are not from CLI").
+opt_criterion(40, "preferred compilers").
 #minimize{ 0@240: #true }.
 #minimize{ 0@40: #true }.
 #minimize{
-    1@40+Priority,PackageNode,DependencyNode
-    : compiler_mismatch(PackageNode, DependencyNode),
-      build_priority(PackageNode, Priority)
-}.
-
-opt_criterion(39, "compiler mismatches that are not from CLI").
-#minimize{ 0@239: #true }.
-#minimize{ 0@39: #true }.
-#minimize{
-    1@39+Priority,PackageNode,DependencyNode
-    : compiler_mismatch_required(PackageNode, DependencyNode),
-      build_priority(PackageNode, Priority)
-}.
-
-% Try to minimize the number of compiler mismatches in the DAG.
-opt_criterion(35, "OS mismatches").
-#minimize{ 0@235: #true }.
-#minimize{ 0@35: #true }.
-#minimize{
-    1@35+Priority,PackageNode,DependencyNode
-    : node_os_mismatch(PackageNode, DependencyNode),
-      build_priority(PackageNode, Priority)
+    Weight@40+Priority,ProviderNode,X,Virtual
+    : provider_weight(ProviderNode, node(X, Virtual), Weight),
+      language(Virtual),
+      build_priority(ProviderNode, Priority)
 }.
 
 opt_criterion(30, "non-preferred OS's").
@@ -1504,13 +1826,15 @@ opt_criterion(30, "non-preferred OS's").
 }.
 
 % Choose more recent versions for nodes
-opt_criterion(25, "version badness").
+opt_criterion(25, "version badness (non roots)").
 #minimize{ 0@225: #true }.
 #minimize{ 0@25: #true }.
 #minimize{
-    Weight@25+Priority,PackageNode
-    : version_weight(PackageNode, Weight),
-      build_priority(PackageNode, Priority)
+    Weight@25+Priority,node(X, Package)
+    : version_weight(node(X, Package), Weight),
+      build_priority(node(X, Package), Priority),
+      not attr("root", node(X, Package)),
+      not runtime(Package)
 }.
 
 % Try to use all the default values of variants
@@ -1524,34 +1848,56 @@ opt_criterion(20, "default values of variants not being used (non-roots)").
       build_priority(PackageNode, Priority)
 }.
 
-% Try to use preferred compilers
-opt_criterion(15, "non-preferred compilers").
-#minimize{ 0@215: #true }.
-#minimize{ 0@15: #true }.
-#minimize{
-    Weight@15+Priority,PackageNode
-    : node_compiler_weight(PackageNode, Weight),
-      build_priority(PackageNode, Priority)
-}.
-
 % Minimize the number of mismatches for targets in the DAG, try
 % to select the preferred target.
 opt_criterion(10, "target mismatches").
 #minimize{ 0@210: #true }.
 #minimize{ 0@10: #true }.
 #minimize{
-    1@10+Priority,PackageNode,Dependency
-    : node_target_mismatch(PackageNode, Dependency),
-      build_priority(PackageNode, Priority)
+    1@10+Priority,PackageNode,node(ID, Dependency)
+    : node_target_mismatch(PackageNode, node(ID, Dependency)),
+      build_priority(node(ID, Dependency), Priority),
+      not runtime(Dependency)
 }.
 
 opt_criterion(5, "non-preferred targets").
 #minimize{ 0@205: #true }.
 #minimize{ 0@5: #true }.
 #minimize{
-    Weight@5+Priority,PackageNode
-    : node_target_weight(PackageNode, Weight),
-      build_priority(PackageNode, Priority)
+    Weight@5+Priority,node(X, Package)
+    : node_target_weight(node(X, Package), Weight),
+      build_priority(node(X, Package), Priority),
+      not runtime(Package)
+}.
+
+opt_criterion(4, "preferred providers (language runtimes)").
+#minimize{ 0@204: #true }.
+#minimize{ 0@4: #true }.
+#minimize{
+    Weight@4+Priority,ProviderNode,X,Virtual
+    : provider_weight(ProviderNode, node(X, Virtual), Weight),
+      language_runtime(Virtual),
+      build_priority(ProviderNode, Priority)
+}.
+
+% Choose more recent versions for runtimes
+opt_criterion(3, "version badness (runtimes)").
+#minimize{ 0@203: #true }.
+#minimize{ 0@3: #true }.
+#minimize{
+    Weight@3,node(X, Package)
+    : version_weight(node(X, Package), Weight),
+      runtime(Package)
+}.
+
+% Choose best target for runtimes
+opt_criterion(2, "non-preferred targets (runtimes)").
+#minimize{ 0@202: #true }.
+#minimize{ 0@2: #true }.
+#minimize{
+    Weight@2,node(X, Package)
+    : node_target_weight(node(X, Package), Weight),
+      runtime(Package)
 }.
 
 % Choose more recent versions for nodes
@@ -1563,6 +1909,16 @@ opt_criterion(1, "edge wiring").
     : version_weight(PackageNode, Weight),
       not attr("root", PackageNode),
       depends_on(ParentNode, PackageNode)
+}.
+
+
+#minimize{ 0@201: #true }.
+#minimize{ 0@1: #true }.
+#minimize{
+    Weight@1,ParentNode,ProviderNode,Virtual
+    : provider_weight(ProviderNode, Virtual, Weight),
+      not attr("root", ProviderNode),
+      depends_on(ParentNode, ProviderNode)
 }.
 
 %-----------

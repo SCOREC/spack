@@ -1,5 +1,4 @@
-.. Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
-   Spack Project Developers. See the top-level COPYRIGHT file for details.
+.. Copyright Spack Project Developers. See COPYRIGHT file for details.
 
    SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
@@ -865,7 +864,7 @@ There are several different ways to use Spack packages once you have
 installed them. As you've seen, spack packages are installed into long
 paths with hashes, and you need a way to get them into your path. The
 easiest way is to use :ref:`spack load <cmd-spack-load>`, which is
-described in the next section.
+described in this section.
 
 Some more advanced ways to use Spack packages include:
 
@@ -959,7 +958,86 @@ use ``spack find --loaded``.
 You can also use ``spack load --list`` to get the same output, but it
 does not have the full set of query options that ``spack find`` offers.
 
-We'll learn more about Spack's spec syntax in the next section.
+We'll learn more about Spack's spec syntax in :ref:`a later section <sec-specs>`.
+
+
+.. _extensions:
+
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Python packages and virtual environments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Spack can install a large number of Python packages. Their names are
+typically prefixed with ``py-``. Installing and using them is no
+different from any other package:
+
+.. code-block:: console
+
+   $ spack install py-numpy
+   $ spack load py-numpy
+   $ python3
+   >>> import numpy
+
+The ``spack load`` command sets the ``PATH`` variable so that the right Python
+executable is used, and makes sure that ``numpy`` and its dependencies can be
+located in the ``PYTHONPATH``.
+
+Spack is different from other Python package managers in that it installs
+every package into its *own* prefix. This is in contrast to ``pip``, which
+installs all packages into the same prefix, be it in a virtual environment
+or not.
+
+For many users, **virtual environments** are more convenient than repeated
+``spack load`` commands, particularly when working with multiple Python
+packages. Fortunately Spack supports environments itself, which together
+with a view are no different from Python virtual environments.
+
+The recommended way of working with Python extensions such as ``py-numpy``
+is through :ref:`Environments <environments>`. The following example creates
+a Spack environment with ``numpy`` in the current working directory. It also
+puts a filesystem view in ``./view``, which is a more traditional combined
+prefix for all packages in the environment.
+
+.. code-block:: console
+
+   $ spack env create --with-view view --dir .
+   $ spack -e . add py-numpy
+   $ spack -e . concretize
+   $ spack -e . install
+
+Now you can activate the environment and start using the packages:
+
+.. code-block:: console
+
+   $ spack env activate .
+   $ python3
+   >>> import numpy
+
+The environment view is also a virtual environment, which is useful if you are
+sharing the environment with others who are unfamiliar with Spack. They can
+either use the Python executable directly:
+
+.. code-block:: console
+
+   $ ./view/bin/python3
+   >>> import numpy
+
+or use the activation script:
+
+.. code-block:: console
+
+   $ source ./view/bin/activate
+   $ python3
+   >>> import numpy
+
+In general, there should not be much difference between ``spack env activate``
+and using the virtual environment. The main advantage of ``spack env activate``
+is that it knows about more packages than just Python packages, and it may set
+additional runtime variables that are not covered by the virtual environment
+activation script.
+
+See :ref:`environments` for a more in-depth description of Spack
+environments and customizations to views.
 
 
 .. _sec-specs:
@@ -1096,6 +1174,17 @@ unspecified version, but packages can depend on other packages with
 could depend on ``mpich@1.2:`` if it can only build with version
 ``1.2`` or higher of ``mpich``.
 
+.. note:: Windows Spec Syntax Caveats
+   Windows has a few idiosyncrasies when it comes to the Spack spec syntax and the use of certain shells
+   Spack's spec dependency syntax uses the carat (``^``) character, however this is an escape string in CMD
+   so it must be escaped with an additional carat (i.e. ``^^``).
+   CMD also will attempt to interpret strings with ``=`` characters in them. Any spec including this symbol
+   must double quote the string.
+
+   Note: All of these issues are unique to CMD, they can be avoided by using Powershell.
+
+   For more context on these caveats see the related issues: `carat <https://github.com/spack/spack/issues/42833>`_ and `equals <https://github.com/spack/spack/issues/43348>`_
+
 Below are more details about the specifiers that you can add to specs.
 
 .. _version-specifier:
@@ -1119,6 +1208,9 @@ and ``3.4.2``.  Similarly, ``@4.2:`` means any version above and including
 ``4.2``.  As a short-hand, ``@3`` is equivalent to the range ``@3:3`` and
 includes any version with major version ``3``.
 
+Versions are ordered lexicograpically by its components. For more details
+on the order, see :ref:`the packaging guide <version-comparison>`.
+
 Notice that you can distinguish between the specific version ``@=3.2`` and
 the range ``@3.2``. This is useful for packages that follow a versioning
 scheme that omits the zero patch version number: ``3.2``, ``3.2.1``,
@@ -1129,6 +1221,10 @@ scheme that omits the zero patch version number: ``3.2``, ``3.2.1``,
 A version specifier can also be a list of ranges and specific versions,
 separated by commas.  For example, ``@1.0:1.5,=1.7.1`` matches any version
 in the range ``1.0:1.5`` and the specific version ``1.7.1``.
+
+^^^^^^^^^^^^
+Git versions
+^^^^^^^^^^^^
 
 For packages with a ``git`` attribute, ``git`` references
 may be specified instead of a numerical version i.e. branches, tags
@@ -1195,55 +1291,61 @@ based on site policies.
 Variants
 ^^^^^^^^
 
-Variants are named options associated with a particular package. They are
-optional, as each package must provide default values for each variant it
-makes available. Variants can be specified using
-a flexible parameter syntax ``name=<value>``. For example,
-``spack install mercury debug=True`` will install mercury built with debug
-flags. The names of particular variants available for a package depend on
+Variants are named options associated with a particular package and are
+typically used to enable or disable certain features at build time. They
+are optional, as each package must provide default values for each variant
+it makes available.
+
+The names of variants available for a particular package depend on
 what was provided by the package author. ``spack info <package>`` will
 provide information on what build variants are available.
 
-For compatibility with earlier versions, variants which happen to be
-boolean in nature can be specified by a syntax that represents turning
-options on and off. For example, in the previous spec we could have
-supplied ``mercury +debug`` with the same effect of enabling the debug
-compile time option for the libelf package.
+There are different types of variants:
 
-Depending on the package a variant may have any default value.  For
-``mercury`` here, ``debug`` is ``False`` by default, and we turned it on
-with ``debug=True`` or ``+debug``.  If a variant is ``True`` by default
-you can turn it off by either adding ``-name`` or ``~name`` to the spec.
+1. Boolean variants. Typically used to enable or disable a feature at
+   compile time. For example, a package might have a ``debug`` variant that
+   can be explicitly enabled with ``+debug`` and disabled with ``~debug``.
+2. Single-valued variants. Often used to set defaults. For example, a package
+   might have a ``compression`` variant that determines the default
+   compression algorithm, which users could set to ``compression=gzip`` or
+   ``compression=zstd``.
+3. Multi-valued variants. A package might have a ``fabrics`` variant that
+   determines which network fabrics to support. Users could set this to
+   ``fabrics=verbs,ofi`` to enable both InfiniBand verbs and OpenFabrics
+   interfaces. The values are separated by commas.
 
-There are two syntaxes here because, depending on context, ``~`` and
-``-`` may mean different things.  In most shells, the following will
-result in the shell performing home directory substitution:
+   The meaning of ``fabrics=verbs,ofi`` is to enable *at least* the specified
+   fabrics, but other fabrics may be enabled as well. If the intent is to
+   enable *only* the specified fabrics, then the ``fabrics:=verbs,ofi``
+   syntax should be used with the ``:=`` operator.
 
-.. code-block:: sh
+.. note::
 
-   mpileaks ~debug   # shell may try to substitute this!
-   mpileaks~debug    # use this instead
+   In certain shells, the the ``~`` character is expanded to the home
+   directory. To avoid these issues, avoid whitespace between the package
+   name and the variant:
 
-If there is a user called ``debug``, the ``~`` will be incorrectly
-expanded.  In this situation, you would want to write ``libelf
--debug``.  However, ``-`` can be ambiguous when included after a
-package name without spaces:
+   .. code-block:: sh
 
-.. code-block:: sh
+      mpileaks ~debug   # shell may try to substitute this!
+      mpileaks~debug    # use this instead
 
-   mpileaks-debug     # wrong!
-   mpileaks -debug    # right
+   Alternatively, you can use the ``-`` character to disable a variant,
+   but be aware that this requires a space between the package name and
+   the variant:
 
-Spack allows the ``-`` character to be part of package names, so the
-above will be interpreted as a request for the ``mpileaks-debug``
-package, not a request for ``mpileaks`` built without ``debug``
-options.  In this scenario, you should write ``mpileaks~debug`` to
-avoid ambiguity.
+   .. code-block:: sh
 
-When spack normalizes specs, it prints them out with no spaces boolean
-variants using the backwards compatibility syntax and uses only ``~``
-for disabled boolean variants.  The ``-`` and spaces on the command
-line are provided for convenience and legibility.
+      mpileaks-debug     # wrong: refers to a package named "mpileaks-debug"
+      mpileaks -debug    # right: refers to a package named mpileaks with debug disabled
+
+   As a last resort, ``debug=False`` can also be used to disable a boolean variant.
+
+
+
+"""""""""""""""""""""""""""""""""""
+Variant propagation to dependencies
+"""""""""""""""""""""""""""""""""""
 
 Spack allows variants to propagate their value to the package's
 dependency by using ``++``, ``--``, and ``~~`` for boolean variants.
@@ -1261,6 +1363,10 @@ For example, for the ``stackstart`` variant:
 
     mpileaks stackstart==4   # variant will be propagated to dependencies
     mpileaks stackstart=4    # only mpileaks will have this variant value
+
+Spack also allows variants to be propagated from a package that does
+not have that variant.
+
 
 ^^^^^^^^^^^^^^
 Compiler Flags
@@ -1309,27 +1415,29 @@ that executables will run without the need to set ``LD_LIBRARY_PATH``.
 
 .. code-block:: yaml
 
-  compilers:
-    - compiler:
-        spec: gcc@4.9.3
-        paths:
-          cc: /opt/gcc/bin/gcc
-          c++: /opt/gcc/bin/g++
-          f77: /opt/gcc/bin/gfortran
-          fc: /opt/gcc/bin/gfortran
-        environment:
-          unset:
-            - BAD_VARIABLE
-          set:
-            GOOD_VARIABLE_NUM: 1
-            GOOD_VARIABLE_STR: good
-          prepend_path:
-            PATH: /path/to/binutils
-          append_path:
-            LD_LIBRARY_PATH: /opt/gcc/lib
-        extra_rpaths:
-        - /path/to/some/compiler/runtime/directory
-        - /path/to/some/other/compiler/runtime/directory
+  packages:
+    gcc:
+      externals:
+      - spec: gcc@4.9.3
+        prefix: /opt/gcc
+        extra_attributes:
+          compilers:
+            c: /opt/gcc/bin/gcc
+            cxx: /opt/gcc/bin/g++
+            fortran: /opt/gcc/bin/gfortran
+          environment:
+            unset:
+              - BAD_VARIABLE
+            set:
+              GOOD_VARIABLE_NUM: 1
+              GOOD_VARIABLE_STR: good
+            prepend_path:
+              PATH: /path/to/binutils
+            append_path:
+              LD_LIBRARY_PATH: /opt/gcc/lib
+          extra_rpaths:
+          - /path/to/some/compiler/runtime/directory
+          - /path/to/some/other/compiler/runtime/directory
 
 
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -1347,22 +1455,12 @@ the reserved keywords ``platform``, ``os`` and ``target``:
    $ spack install libelf os=ubuntu18.04
    $ spack install libelf target=broadwell
 
-or together by using the reserved keyword ``arch``:
-
-.. code-block:: console
-
-   $ spack install libelf arch=cray-CNL10-haswell
-
 Normally users don't have to bother specifying the architecture if they
 are installing software for their current host, as in that case the
 values will be detected automatically.  If you need fine-grained control
 over which packages use which targets (or over *all* packages' default
 target), see :ref:`package-preferences`.
 
-.. admonition:: Cray machines
-
-  The situation is a little bit different for Cray machines and a detailed
-  explanation on how the architecture can be set on them can be found at :ref:`cray-support`
 
 .. _support-for-microarchitectures:
 
@@ -1671,19 +1769,24 @@ Verifying installations
 The ``spack verify`` command can be used to verify the validity of
 Spack-installed packages any time after installation.
 
+
+^^^^^^^^^^^^^^^^^^^^^^^^^
+``spack verify manifest``
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
 At installation time, Spack creates a manifest of every file in the
 installation prefix. For links, Spack tracks the mode, ownership, and
 destination. For directories, Spack tracks the mode, and
 ownership. For files, Spack tracks the mode, ownership, modification
-time, hash, and size. The Spack verify command will check, for every
-file in each package, whether any of those attributes have changed. It
-will also check for newly added files or deleted files from the
-installation prefix. Spack can either check all installed packages
+time, hash, and size. The ``spack verify manifest`` command will check,
+for every file in each package, whether any of those attributes have
+changed. It will also check for newly added files or deleted files from
+the installation prefix. Spack can either check all installed packages
 using the `-a,--all` or accept specs listed on the command line to
 verify.
 
-The ``spack verify`` command can also verify for individual files that
-they haven't been altered since installation time. If the given file
+The ``spack verify manifest`` command can also verify for individual files
+that they haven't been altered since installation time. If the given file
 is not in a Spack installation prefix, Spack will report that it is
 not owned by any package. To check individual files instead of specs,
 use the ``-f,--files`` option.
@@ -1698,164 +1801,21 @@ check only local packages (as opposed to those used transparently from
 ``upstream`` spack instances) and the ``-j,--json`` option to output
 machine-readable json data for any errors.
 
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+``spack verify libraries``
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. _extensions:
+The ``spack verify libraries`` command can be used to verify that packages
+do not have accidental system dependencies. This command scans the install
+prefixes of packages for executables and shared libraries, and resolves
+their needed libraries in their RPATHs. When needed libraries cannot be
+located, an error is reported. This typically indicates that a package
+was linked against a system library, instead of a library provided by
+a Spack package.
 
----------------------------
-Extensions & Python support
----------------------------
-
-Spack's installation model assumes that each package will live in its
-own install prefix.  However, certain packages are typically installed
-*within* the directory hierarchy of other packages.  For example,
-`Python <https://www.python.org>`_ packages are typically installed in the
-``$prefix/lib/python-2.7/site-packages`` directory.
-
-In Spack, installation prefixes are immutable, so this type of installation
-is not directly supported. However, it is possible to create views that
-allow you to merge install prefixes of multiple packages into a single new prefix.
-Views are a convenient way to get a more traditional filesystem structure.
-Using *extensions*, you can ensure that Python packages always share the
-same prefix in the view as Python itself. Suppose you have
-Python installed like so:
-
-.. code-block:: console
-
-   $ spack find python
-   ==> 1 installed packages.
-   -- linux-debian7-x86_64 / gcc@4.4.7 --------------------------------
-   python@2.7.8
-
-.. _cmd-spack-extensions:
-
-^^^^^^^^^^^^^^^^^^^^
-``spack extensions``
-^^^^^^^^^^^^^^^^^^^^
-
-You can find extensions for your Python installation like this:
-
-.. code-block:: console
-
-   $ spack extensions python
-   ==> python@2.7.8%gcc@4.4.7 arch=linux-debian7-x86_64-703c7a96
-   ==> 36 extensions:
-   geos          py-ipython     py-pexpect    py-pyside            py-sip
-   py-basemap    py-libxml2     py-pil        py-pytz              py-six
-   py-biopython  py-mako        py-pmw        py-rpy2              py-sympy
-   py-cython     py-matplotlib  py-pychecker  py-scientificpython  py-virtualenv
-   py-dateutil   py-mpi4py      py-pygments   py-scikit-learn
-   py-epydoc     py-mx          py-pylint     py-scipy
-   py-gnuplot    py-nose        py-pyparsing  py-setuptools
-   py-h5py       py-numpy       py-pyqt       py-shiboken
-
-   ==> 12 installed:
-   -- linux-debian7-x86_64 / gcc@4.4.7 --------------------------------
-   py-dateutil@2.4.0    py-nose@1.3.4       py-pyside@1.2.2
-   py-dateutil@2.4.0    py-numpy@1.9.1      py-pytz@2014.10
-   py-ipython@2.3.1     py-pygments@2.0.1   py-setuptools@11.3.1
-   py-matplotlib@1.4.2  py-pyparsing@2.0.3  py-six@1.9.0
-
-The extensions are a subset of what's returned by ``spack list``, and
-they are packages like any other.  They are installed into their own
-prefixes, and you can see this with ``spack find --paths``:
-
-.. code-block:: console
-
-   $ spack find --paths py-numpy
-   ==> 1 installed packages.
-   -- linux-debian7-x86_64 / gcc@4.4.7 --------------------------------
-       py-numpy@1.9.1  ~/spack/opt/linux-debian7-x86_64/gcc@4.4.7/py-numpy@1.9.1-66733244
-
-However, even though this package is installed, you cannot use it
-directly when you run ``python``:
-
-.. code-block:: console
-
-   $ spack load python
-   $ python
-   Python 2.7.8 (default, Feb 17 2015, 01:35:25)
-   [GCC 4.4.7 20120313 (Red Hat 4.4.7-11)] on linux2
-   Type "help", "copyright", "credits" or "license" for more information.
-   >>> import numpy
-   Traceback (most recent call last):
-     File "<stdin>", line 1, in <module>
-   ImportError: No module named numpy
-   >>>
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Using Extensions in Environments
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The recommended way of working with extensions such as ``py-numpy``
-above is through :ref:`Environments <environments>`. For example,
-the following creates an environment in the current working directory
-with a filesystem view in the ``./view`` directory:
-
-.. code-block:: console
-
-   $ spack env create --with-view view --dir .
-   $ spack -e . add py-numpy
-   $ spack -e . concretize
-   $ spack -e . install
-
-We recommend environments for two reasons. Firstly, environments
-can be activated (requires :ref:`shell-support`):
-
-.. code-block:: console
-
-   $ spack env activate .
-
-which sets all the right environment variables such as ``PATH`` and
-``PYTHONPATH``. This ensures that
-
-.. code-block:: console
-
-   $ python
-   >>> import numpy
-
-works. Secondly, even without shell support, the view ensures
-that Python can locate its extensions:
-
-.. code-block:: console
-
-   $ ./view/bin/python
-   >>> import numpy
-
-See :ref:`environments` for a more in-depth description of Spack
-environments and customizations to views.
-
-^^^^^^^^^^^^^^^^^^^^
-Using ``spack load``
-^^^^^^^^^^^^^^^^^^^^
-
-A more traditional way of using Spack and extensions is ``spack load``
-(requires :ref:`shell-support`). This will add the extension to ``PYTHONPATH``
-in your current shell, and Python itself will be available in the ``PATH``:
-
-.. code-block:: console
-
-   $ spack load py-numpy
-   $ python
-   >>> import numpy
-
-The loaded packages can be checked using ``spack find --loaded``
-
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Loading Extensions via Modules
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Apart from ``spack env activate`` and ``spack load``, you can load numpy
-through your environment modules (using ``environment-modules`` or
-``lmod``). This will also add the extension to the ``PYTHONPATH`` in
-your current shell.
-
-.. code-block:: console
-
-   $ module load <name of numpy module>
-
-If you do not know the name of the specific numpy module you wish to
-load, you can use the ``spack module tcl|lmod loads`` command to get
-the name of the module from the Spack spec.
+This verification can also be enabled as a post-install hook by setting
+``config:shared_linking:missing_library_policy`` to ``error`` or ``warn``
+in :ref:`config.yaml <config-yaml>`.
 
 -----------------------
 Filesystem requirements
@@ -1956,7 +1916,7 @@ diagnostics. Issues, if found, are reported to stdout:
    PKG-DIRECTIVES: 1 issue found
    1. lammps: wrong variant in "conflicts" directive
        the variant 'adios' does not exist
-       in /home/spack/spack/var/spack/repos/builtin/packages/lammps/package.py
+       in /home/spack/spack/var/spack/repos/spack_repo/builtin/packages/lammps/package.py
 
 
 ------------

@@ -1,5 +1,4 @@
-# Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
-# Spack Project Developers. See the top-level COPYRIGHT file for details.
+# Copyright Spack Project Developers. See COPYRIGHT file for details.
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
@@ -11,11 +10,7 @@ from spack.version import Version
 versions = SpackCommand("versions")
 
 
-def test_safe_only_versions():
-    """Only test the safe versions of a package.
-    (Using the deprecated command line argument)
-    """
-    versions("--safe-only", "zlib")
+pytestmark = [pytest.mark.usefixtures("mock_packages")]
 
 
 def test_safe_versions():
@@ -68,13 +63,6 @@ def test_new_versions_only(monkeypatch):
 
 
 @pytest.mark.maybeslow
-def test_no_versions():
-    """Test a package for which no remote versions are available."""
-
-    versions("converge")
-
-
-@pytest.mark.maybeslow
 def test_no_unchecksummed_versions():
     """Test a package for which no unchecksummed versions are available."""
 
@@ -85,11 +73,11 @@ def test_no_unchecksummed_versions():
 def test_versions_no_url():
     """Test a package with versions but without a ``url`` attribute."""
 
-    versions("graphviz")
+    versions("attributes-foo-app")
 
 
 @pytest.mark.maybeslow
 def test_no_versions_no_url():
     """Test a package without versions or a ``url`` attribute."""
 
-    versions("opengl")
+    versions("no-url-or-version")

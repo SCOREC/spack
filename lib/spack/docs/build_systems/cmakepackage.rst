@@ -1,5 +1,4 @@
-.. Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
-   Spack Project Developers. See the top-level COPYRIGHT file for details.
+.. Copyright Spack Project Developers. See COPYRIGHT file for details.
 
    SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
@@ -200,7 +199,7 @@ a variant to control this:
 However, not every CMake package accepts all four of these options.
 Grep the ``CMakeLists.txt`` file to see if the default values are
 missing or replaced. For example, the
-`dealii <https://github.com/spack/spack/blob/develop/var/spack/repos/builtin/packages/dealii/package.py>`_
+`dealii <https://github.com/spack/spack/blob/develop/var/spack/repos/spack_repo/builtin/packages/dealii/package.py>`_
 package overrides the default variant with:
 
 .. code-block:: python
@@ -250,7 +249,7 @@ generator is Ninja. To switch to the Ninja generator, simply add:
 
 .. code-block:: python
 
-   generator = "Ninja"
+   generator("ninja")
 
 
 ``CMakePackage`` defaults to "Unix Makefiles". If you switch to the

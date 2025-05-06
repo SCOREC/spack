@@ -1,5 +1,4 @@
-.. Copyright 2013-2024 Lawrence Livermore National Security, LLC and other
-   Spack Project Developers. See the top-level COPYRIGHT file for details.
+.. Copyright Spack Project Developers. See COPYRIGHT file for details.
 
    SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
@@ -12,9 +11,10 @@ Configuration Files
 Spack has many configuration files.  Here is a quick list of them, in
 case you want to skip directly to specific docs:
 
-* :ref:`compilers.yaml <compiler-config>`
+* :ref:`packages.yaml <compiler-config>`
 * :ref:`concretizer.yaml <concretizer-options>`
 * :ref:`config.yaml <config-yaml>`
+* :ref:`include.yaml <include-yaml>`
 * :ref:`mirrors.yaml <mirrors>`
 * :ref:`modules.yaml <modules>`
 * :ref:`packages.yaml <packages-config>`
@@ -46,6 +46,12 @@ Each Spack configuration file is nested under a top-level section
 corresponding to its name. So, ``config.yaml`` starts with ``config:``,
 ``mirrors.yaml`` starts with ``mirrors:``, etc.
 
+.. tip::
+
+   Validation and autocompletion of Spack config files can be enabled in
+   your editor with the YAML language server. See `spack/schemas
+   <https://github.com/spack/schemas>`_ for more information.
+
 .. _configuration-scopes:
 
 --------------------
@@ -73,9 +79,12 @@ are six configuration scopes. From lowest to highest:
    Spack instance per project) or for site-wide settings on a multi-user
    machine (e.g., for a common Spack instance).
 
+#. **plugin**: Read from a Python project's entry points. Settings here affect
+   all instances of Spack running with the same Python installation.  This scope takes higher precedence than site, system, and default scopes.
+
 #. **user**: Stored in the home directory: ``~/.spack/``. These settings
    affect all instances of Spack and take higher precedence than site,
-   system, or defaults scopes.
+   system, plugin, or defaults scopes.
 
 #. **custom**: Stored in a custom directory specified by ``--config-scope``.
    If multiple scopes are listed on the command line, they are ordered
@@ -92,7 +101,7 @@ are six configuration scopes. From lowest to highest:
    precedence over all other scopes.
 
 Each configuration directory may contain several configuration files,
-such as ``config.yaml``, ``compilers.yaml``, or ``mirrors.yaml``.  When
+such as ``config.yaml``, ``packages.yaml``, or ``mirrors.yaml``.  When
 configurations conflict, settings from higher-precedence scopes override
 lower-precedence settings.
 
@@ -196,6 +205,45 @@ with MPICH. You can create different configuration scopes for use with
                mpi: [mpich]
 
 
+.. _plugin-scopes:
+
+^^^^^^^^^^^^^
+Plugin scopes
+^^^^^^^^^^^^^
+
+.. note::
+   Python version >= 3.8 is required to enable plugin configuration.
+
+Spack can be made aware of configuration scopes that are installed as part of a python package.  To do so, register a function that returns the scope's path to the ``"spack.config"`` entry point.  Consider the Python package ``my_package`` that includes Spack configurations:
+
+.. code-block:: console
+
+  my-package/
+  ├── src
+  │   ├── my_package
+  │   │   ├── __init__.py
+  │   │   └── spack/
+  │   │   │   └── config.yaml
+  └── pyproject.toml
+
+adding the following to ``my_package``'s ``pyproject.toml`` will make ``my_package``'s ``spack/`` configurations visible to Spack when ``my_package`` is installed:
+
+.. code-block:: toml
+
+   [project.entry_points."spack.config"]
+   my_package = "my_package:get_config_path"
+
+The function ``my_package.get_extension_path`` in ``my_package/__init__.py`` might look like
+
+.. code-block:: python
+
+   import importlib.resources
+
+   def get_config_path():
+       dirname = importlib.resources.files("my_package").joinpath("spack")
+       if dirname.exists():
+           return str(dirname)
+
 .. _platform-scopes:
 
 ------------------------
@@ -239,7 +287,7 @@ When spack queries for configuration parameters, it searches in
 higher-precedence scopes first. So, settings in a higher-precedence file
 can override those with the same key in a lower-precedence one. For
 list-valued settings, Spack *prepends* higher-precedence settings to
-lower-precedence settings. Completely ignoring higher-level configuration
+lower-precedence settings. Completely ignoring lower-precedence configuration
 options is supported with the ``::`` notation for keys (see
 :ref:`config-overrides` below).
 
@@ -469,6 +517,7 @@ Spack understands over a dozen special variables. These are:
 * ``$target_family``. The target family for the current host, as
   detected by ArchSpec. E.g. ``x86_64`` or ``aarch64``.
 * ``$date``: the current date in the format YYYY-MM-DD
+* ``$spack_short_version``: the Spack version truncated to the first components.
 
 
 Note that, as with shell variables, you can write these as ``$varname``
