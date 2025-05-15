@@ -2,6 +2,8 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+import os
+
 from spack.package import *
 
 
@@ -127,9 +129,18 @@ class Pumi(CMakePackage):
             "pipe_2_.smb",
             "2",
         ]
-        exe = which(self.spec["mpi"].prefix.bin.mpiexec)
-        out = exe(*options, output=str.split, error=str.split)
-        assert "mesh pipe_2_.smb written" in out
+        mpiexe_list = [self.spec["mpi"].prefix.bin.mpirun, self.spec["mpi"].prefix.bin.mpiexec, "srun"]
+        for mpiexe in mpiexe_list:
+            tty.info(f"Attempting to build and launch with {os.path.basename(mpiexe)}")
+            try:
+                options = ["--immediate=30"] + options if mpiexe == "srun" else options
+                exe = which(mpiexe)
+                out = exe(*options, output=str.split, error=str.split)
+                assert "mesh pipe_2_.smb written" in out
+                return
+            except (Exception, ProcessError) as err:
+                    tty.info(f"Skipping {mpiexe}: {str(err)}")
+        assert False, "No MPI executable was found"
 
     def test_refine(self):
         """Testing pumi uniform mesh refinement"""
